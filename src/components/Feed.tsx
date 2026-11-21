@@ -102,6 +102,9 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
   }, [paused]);
   const [fullscreen, setFullscreen] = useState(false);
   const [heartBurst, setHeartBurst] = useState(0);
+  /* 红果式双击点赞：屏幕上飘心 */
+  const [floatHearts, setFloatHearts] = useState<{ id: number; x: number; y: number }[]>([]);
+  const heartIdRef = useRef(0);
   /* —— 移动端手势 & 竖屏横片缩放 —— */
   const [holdSpeed, setHoldSpeed] = useState(false);
   const [speedLock, setSpeedLock] = useState(false);
@@ -635,13 +638,23 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
     const moveDist = e ? Math.hypot(e.clientX - g.x, e.clientY - g.y) : 0;
     if (Date.now() - g.t < 260 && moveDist < 16) {
       const now = Date.now();
+      const tapX = e?.clientX ?? g.x;
+      const tapY = e?.clientY ?? g.y;
       if (now - lastTapRef.current.time < 280) {
-        // 双击屏幕：切换暂停 / 播放
+        // 红果式：双击点赞（未赞时点赞并飘心；已赞则切暂停）
         clearTapTimer();
         lastTapRef.current.time = 0;
-        videoRef.current?.toggle();
+        if (!isLiked(curId)) {
+          const box = boxRef.current?.getBoundingClientRect();
+          onLike({
+            x: box ? tapX - box.left : tapX,
+            y: box ? tapY - box.top : tapY,
+          });
+        } else {
+          videoRef.current?.toggle();
+        }
       } else {
-        // 单击屏幕：切换清屏模式（消除或恢复所有界面控件，只显示视频内容）
+        // 单击：显示 / 隐藏控件（清屏）
         lastTapRef.current.time = now;
         clearTapTimer();
         lastTapRef.current.timer = window.setTimeout(() => {
@@ -735,11 +748,22 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
 
   const requireLogin = () => { if (!user) { setLoginOpen(true); return false; } return true; };
 
-  const onLike = () => {
+  const spawnHeart = (x: number, y: number) => {
+    const id = ++heartIdRef.current;
+    setFloatHearts((list) => [...list.slice(-6), { id, x, y }]);
+    window.setTimeout(() => setFloatHearts((list) => list.filter((h) => h.id !== id)), 900);
+  };
+
+  const onLike = (at?: { x: number; y: number }) => {
     if (!curId) return;
+    const wasLiked = isLiked(curId);
     const on = toggleLikeLocal(curId);
     setHeartBurst((n) => n + 1);
-    toast(on ? "已加入喜欢" : "已取消喜欢", on ? "heart" : "info");
+    if (on && !wasLiked) {
+      const box = boxRef.current?.getBoundingClientRect();
+      spawnHeart(at?.x ?? (box ? box.width * 0.5 : window.innerWidth * 0.5), at?.y ?? (box ? box.height * 0.42 : window.innerHeight * 0.42));
+    }
+    toast(on ? "已喜欢" : "已取消喜欢", on ? "heart" : "info");
     if (requireLogin()) { if (kind === "post") api.postLike(curId, on).catch(() => {}); else api.like(curId, curEp, on).catch(() => {}); }
   };
 
@@ -855,8 +879,7 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
                   {/* 暂停 / 缓冲 / 报错恢复 */}
                   {paused && !err && (
                     <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-                      <span className="w-[66px] h-[66px] rounded-full flex items-center justify-center backdrop-blur-md"
-                        style={{ background: "rgba(0,0,0,.55)", boxShadow: "inset 0 0 0 1px rgba(255,255,255,.12)" }}>
+                      <span className="hg-pause-orb">
                         <IPlayF size={28} className="hg-ink ml-0.5" />
                       </span>
                     </div>
@@ -921,15 +944,16 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
                           还原画面 ({zoom.scale.toFixed(1)}x)
                         </button>
                       )}
-                      <div className="absolute inset-x-0 z-30 px-4" style={{ bottom: rotated || vpLandscape ? 46 : "calc(var(--sab, 0px) + 52px)", height: 26 }}>
-                        <div className="relative h-full" style={{ touchAction: "none" }}
+                      <div className="absolute inset-x-0 z-30 px-4" style={{ bottom: rotated || vpLandscape ? 46 : "calc(var(--sab, 0px) + 52px)" }}>
+                        <div className={`hg-seek ${barPct !== null ? "is-scrubbing" : ""}`}
                           onPointerDown={onBarDown} onPointerMove={onBarMove} onPointerUp={onBarUp} onPointerCancel={onBarUp}>
-                          <div className={`absolute inset-x-0 bottom-[10px] rounded-full transition-all ${barPct !== null ? "h-[5px]" : "h-[3px]"}`}
-                            style={{ background: "rgba(255,255,255,.3)" }}>
-                            <div className="h-full rounded-full bg-white" style={{ width: `${barProgress * 100}%` }} />
+                          <div className="hg-seek-track">
+                            <div className="hg-seek-played" style={{ width: `${barProgress * 100}%` }}>
+                              <span className="hg-seek-thumb" />
+                            </div>
                           </div>
                           {barPct !== null && (
-                            <div className="absolute left-1/2 -translate-x-1/2 -top-8 px-2.5 py-1 rounded-md hg-chip-strong backdrop-blur-md text-[12px] font-bold tabular-nums whitespace-nowrap">
+                            <div className="hg-seek-tip">
                               {fmtTime(barPct * (duration || 0))} / {fmtTime(duration)}
                             </div>
                           )}
@@ -1055,31 +1079,42 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
                 )
               ) : null}
 
-              {/* 右侧操作栏（移动端）：收藏 / 评论 / 全屏 / 分享
-                  颜色写死不跟主题走：浅色主题下这些字必须仍是白色 */}
+              {/* 右侧操作栏（移动端 · 红果式）：点赞 / 评论 / 收藏 / 选集 / 分享 */}
               {!fs && !clean && !isDesktop && (
-                <div className="absolute right-3 z-20 flex flex-col items-center gap-[16px]"
-                  style={{ bottom: `calc(var(--sab, 0px) + ${bottomInset + 92}px)` }}>
-                  <button onClick={onFav} className="flex flex-col items-center gap-1 pressable" aria-pressed={isFav(curId)} aria-label="收藏">
-                    {isFav(curId) ? <IStarF size={27} className="hg-gold" /> : <IStar size={27} className="hg-ink hg-ov-shadow" />}
-                    <span className="text-[10.5px] hg-ink-2 hg-ov-shadow">收藏</span>
+                <div className="hg-social absolute right-2.5 z-20"
+                  style={{ bottom: `calc(var(--sab, 0px) + ${bottomInset + 108}px)` }}>
+                  {kind === "video" && (
+                    <button onClick={() => onLike()} className={`hg-social-btn pressable ${isLiked(curId) ? "is-on" : ""}`} aria-pressed={isLiked(curId)} aria-label="点赞">
+                      <span key={heartBurst} className={`hg-social-icon ${heartBurst ? "a-pop" : ""}`}>
+                        {isLiked(curId) ? <IHeartF size={24} className="hg-accent" /> : <IHeart size={24} className="hg-ink" />}
+                      </span>
+                      <span className="hg-social-count">{fmt(likeCount)}</span>
+                    </button>
+                  )}
+                  <button onClick={() => setPanel("comments")} className="hg-social-btn pressable" aria-label="评论">
+                    <span className="hg-social-icon"><ICommentF size={22} className="hg-ink" /></span>
+                    <span className="hg-social-count">{meta.comment ? fmt(meta.comment) : "评论"}</span>
                   </button>
-                  <button onClick={() => setPanel("comments")} className="flex flex-col items-center gap-1 pressable" aria-label="评论">
-                    <ICommentF size={26} className="hg-ink hg-ov-shadow" />
-                    <span className="text-[10.5px] hg-ink-2 hg-ov-shadow">评论</span>
+                  <button onClick={onFav} className={`hg-social-btn pressable ${isFav(curId) ? "is-on" : ""}`} aria-pressed={isFav(curId)} aria-label="收藏">
+                    <span className="hg-social-icon">
+                      {isFav(curId) ? <IStarF size={22} className="hg-gold" /> : <IStar size={22} className="hg-ink" />}
+                    </span>
+                    <span className="hg-social-count">{meta.collect ? fmt(meta.collect) : "收藏"}</span>
                   </button>
-                  <button onClick={enterFs} className="flex flex-col items-center gap-1 pressable" aria-label="全屏">
-                    <IExpand size={26} className="hg-ink hg-ov-shadow" />
-                    <span className="text-[10.5px] hg-ink-2 hg-ov-shadow">全屏</span>
-                  </button>
-                  <button onClick={shareLink} className="flex flex-col items-center gap-1 pressable" aria-label="分享">
-                    <ILink size={25} className="hg-ink hg-ov-shadow" />
-                    <span className="text-[10.5px] hg-ink-2 hg-ov-shadow">分享</span>
+                  {kind === "video" && (
+                    <button onClick={() => setPanel("episodes")} className="hg-social-btn pressable" aria-label="选集">
+                      <span className="hg-social-icon"><IList size={22} className="hg-ink" /></span>
+                      <span className="hg-social-count">选集</span>
+                    </button>
+                  )}
+                  <button onClick={shareLink} className="hg-social-btn pressable" aria-label="分享">
+                    <span className="hg-social-icon"><ILink size={21} className="hg-ink" /></span>
+                    <span className="hg-social-count">分享</span>
                   </button>
                 </div>
               )}
 
-              {/* 右侧操作栏（桌面） */}
+              {/* 右侧操作栏（桌面 · 红果式圆形按钮） */}
               {!fs && isDesktop && (
               <div className="absolute z-20 flex flex-col items-center desktop-social">
                 <div className="desktop-browse-inline">
@@ -1094,94 +1129,138 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
 
                 {kind === "video" && (
                   <>
-                    <button onClick={onLike} className="flex flex-col items-center gap-1 pressable" aria-pressed={isLiked(curId)}>
-                      <span key={heartBurst} className={heartBurst ? "a-pop" : ""}>
-                        {isLiked(curId) ? <IHeartF size={30} className="text-neon" /> : <IHeart size={30} className="text-white tsh" />}
+                    <button onClick={() => onLike()} className="pressable" aria-pressed={isLiked(curId)}>
+                      <span key={heartBurst} className={`hg-social-icon ${heartBurst ? "a-pop" : ""}`}>
+                        {isLiked(curId) ? <IHeartF size={22} className="hg-accent" /> : <IHeart size={22} className="text-white" />}
                       </span>
-                      <span className="text-[10.5px] text-white/90 tabular-nums">{fmt(likeCount)}</span>
+                      <span>{fmt(likeCount)}</span>
                     </button>
 
-                    <button onClick={() => setPanel("comments")} className="flex flex-col items-center gap-1 pressable">
-                      <ICommentF size={27} className="text-white tsh" />
-                      <span className="text-[10.5px] text-white/90 tabular-nums">{fmt(meta.comment)}</span>
+                    <button onClick={() => setPanel("comments")} className="pressable">
+                      <span className="hg-social-icon"><ICommentF size={20} className="text-white" /></span>
+                      <span>{fmt(meta.comment)}</span>
                     </button>
 
-                    <button onClick={onFav} className="flex flex-col items-center gap-1 pressable" aria-pressed={isFav(curId)}>
-                      {isFav(curId) ? <IStarF size={27} className="hg-gold" /> : <IStar size={27} className="hg-ink hg-ov-shadow" />}
-                      <span className="text-[10.5px] text-white/90 tabular-nums">{fmt(meta.collect)}</span>
+                    <button onClick={onFav} className="pressable" aria-pressed={isFav(curId)}>
+                      <span className="hg-social-icon">
+                        {isFav(curId) ? <IStarF size={20} className="hg-gold" /> : <IStar size={20} className="text-white" />}
+                      </span>
+                      <span>{fmt(meta.collect)}</span>
                     </button>
 
-                    <button onClick={() => setPanel("episodes")} className="flex flex-col items-center gap-1 pressable">
-                      <IList size={26} className="text-white tsh" />
-                      <span className="text-[10.5px] text-white/90">选集</span>
+                    <button onClick={() => setPanel("episodes")} className="pressable">
+                      <span className="hg-social-icon"><IList size={20} className="text-white" /></span>
+                      <span>选集</span>
                     </button>
                   </>
                 )}
 
-                <button onClick={shareLink} className="flex flex-col items-center gap-1 pressable">
-                  <ILink size={25} className="text-white tsh" />
-                  <span className="text-[10.5px] text-white/90">分享</span>
+                <button onClick={shareLink} className="pressable">
+                  <span className="hg-social-icon"><ILink size={19} className="text-white" /></span>
+                  <span>分享</span>
                 </button>
               </div>
               )}
 
-              {/* 桌面：左下信息 */}
+              {/* 桌面：左下信息（红果式作者行 + 选集胶囊） */}
               {!fs && isDesktop && (
               <div className="desktop-video-meta">
-                <div className="flex items-center gap-2">
-                  <span className="text-[15px] font-bold text-white tsh truncate">@{meta.author}</span>
+                <div className="flex items-center gap-2.5 mb-1.5">
+                  <Avatar size={32} name={meta.author} hue={350} />
+                  <span className="text-[14.5px] font-bold text-white tsh truncate">@{meta.author}</span>
+                  {meta.authorId > 0 && (
+                    <button type="button" onClick={onFollow}
+                      className={`hg-follow-btn pressable ${store.follows.includes(meta.authorId) ? "is-on" : ""}`}
+                      style={{ height: 24, fontSize: 11 }}>
+                      {store.follows.includes(meta.authorId) ? "已关注" : "+ 关注"}
+                    </button>
+                  )}
                   {episodes.length > 0 && (
-                    <span className="shrink-0 px-1.5 py-px rounded-md text-[10px] font-bold text-white"
-                      style={{ background: "rgba(255,255,255,.16)" }}>
-                      第 {curEp}/{episodes.length} 集
-                    </span>
+                    <button type="button" onClick={() => setPanel("episodes")} className="hg-ep-cta pressable" style={{ height: 24, fontSize: 11 }}>
+                      第 {curEp}/{episodes.length} 集 <IChevR size={11} />
+                    </button>
                   )}
                   {!!meta.score && (
-                    <span className="shrink-0 text-[11px] font-bold hg-gold hg-ov-shadow">{meta.score.toFixed(1)} 分</span>
+                    <span className="shrink-0 text-[11px] font-bold" style={{ color: "#ffb3c0" }}>{meta.score.toFixed(1)} 分</span>
                   )}
                 </div>
 
-                <p className="mt-1 text-[13.5px] leading-snug hg-ink-2 hg-ov-shadow clamp-2">{meta.title}</p>
+                <p className="text-[15px] font-bold leading-snug text-white tsh clamp-2">{meta.title}</p>
 
-                {/* 描述（单行，点开展开） */}
-                <button onClick={() => setDescOpen((v) => !v)} className="mt-1 text-left w-full pressable group">
-                  <p className={`text-[11.5px] leading-relaxed hg-ink-4 ${descOpen ? "" : "clamp-1"}`}>
+                <button onClick={() => setDescOpen((v) => !v)} className="mt-1.5 text-left w-full pressable group">
+                  <p className={`text-[12px] leading-relaxed hg-ink-3 ${descOpen ? "" : "clamp-1"}`}>
                     {meta.desc || "暂无简介"}
                   </p>
-                  <span className="text-[10.5px] hg-link font-semibold">{descOpen ? "收起" : "展开简介"}</span>
+                  <span className="text-[11px] font-semibold" style={{ color: "#ff8fa3" }}>{descOpen ? "收起" : "展开简介"}</span>
                 </button>
               </div>
               )}
 
-              {/* 移动端：标题 + 详情标签 + 进度线（清屏 clean 模式下隐藏） */}
+              {/* 移动端：红果式底部信息（作者 / 标题 / 选集 CTA / 进度条） */}
               {!fs && !clean && !isDesktop && (
-                <div className="absolute inset-x-0 z-20" style={{ bottom: `calc(var(--sab, 0px) + ${bottomInset}px)` }}>
-                  <div className="absolute inset-x-0 bottom-0 h-[190px] pointer-events-none"
-                    style={{ background: "linear-gradient(0deg, rgba(0,0,0,.82) 0%, rgba(0,0,0,.42) 45%, transparent 100%)" }} />
-                  <p className="relative px-4 pb-2 text-[14px] font-semibold leading-snug hg-ink hg-ov-shadow clamp-2">{meta.title}</p>
-                  <div className="relative pt-1.5 pb-2">
-                    <button onClick={() => setPanel("detail")}
-                      className="px-4 flex items-center gap-0.5 text-[10.5px] font-medium hg-ink hg-ov-shadow pressable">
-                      详情 · 第 {curEp} 集<IChevR size={11} />
+                <div className="hg-meta-panel absolute inset-x-0 z-20" style={{ bottom: `calc(var(--sab, 0px) + ${bottomInset}px)`, paddingRight: 64 }}>
+                  <div className="hg-meta-veil" />
+                  <div className="hg-author-row">
+                    <Avatar size={34} name={meta.author} hue={350} ring={meta.authorId > 0 && store.follows.includes(meta.authorId)} />
+                    <button type="button" onClick={() => setPanel("detail")} className="min-w-0 flex-1 text-left pressable">
+                      <div className="hg-author-name truncate">@{meta.author}</div>
                     </button>
-                    {isActive && (
-                      <div className="mx-4 mt-1.5 relative" style={{ height: 22, touchAction: "none" }}
-                        onPointerDown={onBarDown} onPointerMove={onBarMove} onPointerUp={onBarUp} onPointerCancel={onBarUp}>
-                        <div className={`absolute inset-x-0 top-1/2 -translate-y-1/2 rounded-full transition-all ${barPct !== null ? "h-[5px]" : "h-[2.5px]"}`}
-                          style={{ background: "rgba(255,255,255,.3)" }}>
-                          <div className="h-full rounded-full bg-white"
-                            style={{ width: `${barProgress * 100}%`, transition: barPct !== null ? "none" : "width .25s linear" }} />
-                        </div>
-                        {barPct !== null && (
-                          <div className="absolute left-1/2 -translate-x-1/2 -top-8 px-2.5 py-1 rounded-md hg-chip-strong backdrop-blur-md text-[12px] font-bold tabular-nums whitespace-nowrap">
-                            {fmtTime(barPct * (duration || 0))} / {fmtTime(duration)}
-                          </div>
-                        )}
-                      </div>
+                    {meta.authorId > 0 && (
+                      <button type="button" onClick={onFollow}
+                        className={`hg-follow-btn pressable ${store.follows.includes(meta.authorId) ? "is-on" : ""}`}>
+                        {store.follows.includes(meta.authorId) ? "已关注" : "+ 关注"}
+                      </button>
                     )}
                   </div>
+                  <p className="hg-title-line clamp-2">{meta.title || "加载中…"}</p>
+                  <div className="hg-ep-row">
+                    {kind === "video" && (
+                      <>
+                        <button type="button" onClick={() => setPanel("detail")} className="hg-ep-pill pressable">
+                          第 {curEp}{episodes.length ? ` / ${episodes.length}` : ""} 集
+                        </button>
+                        <button type="button" onClick={() => setPanel("episodes")} className="hg-ep-cta pressable">
+                          <IList size={12} />
+                          {episodes.length ? `全${episodes.length}集` : "选集"}
+                          <IChevR size={11} />
+                        </button>
+                      </>
+                    )}
+                    {kind === "post" && (
+                      <button type="button" onClick={() => setPanel("detail")} className="hg-ep-pill pressable">
+                        详情<IChevR size={11} />
+                      </button>
+                    )}
+                    {!!meta.score && (
+                      <span className="hg-ep-pill" style={{ background: "rgba(255,77,106,.22)", color: "#ffb3c0" }}>
+                        {meta.score.toFixed(1)} 分
+                      </span>
+                    )}
+                  </div>
+                  {isActive && hasVideo && (
+                    <div className={`hg-seek ${barPct !== null ? "is-scrubbing" : ""}`}
+                      onPointerDown={onBarDown} onPointerMove={onBarMove} onPointerUp={onBarUp} onPointerCancel={onBarUp}>
+                      <div className="hg-seek-track">
+                        <div className="hg-seek-played" style={{ width: `${barProgress * 100}%`, transition: barPct !== null ? "none" : "width .25s linear" }}>
+                          <span className="hg-seek-thumb" />
+                        </div>
+                      </div>
+                      {barPct !== null && (
+                        <div className="hg-seek-tip">
+                          {fmtTime(barPct * (duration || 0))} / {fmtTime(duration)}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
+
+              {/* 双击点赞飘心 */}
+              {isActive && floatHearts.map((h) => (
+                <span key={h.id} className="hg-heart-burst" style={{ left: h.x, top: h.y }}>
+                  <IHeartF size={72} />
+                </span>
+              ))}
             </section>
           );
         })}

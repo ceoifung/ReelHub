@@ -31,12 +31,17 @@ export const LOCAL = isMacos || isIos || isLinux ? "hg://localhost" : "http://hg
 /** src 是否已是本地协议地址（避免在详情页把代理地址再包一层） */
 export const isLocalMedia = (src: string) => src.startsWith(`${LOCAL}/`);
 
+/** 浏览器预览 mock：跳过 hg 本地协议改写，直接用可播地址。 */
+const browserPreview = () =>
+  typeof window !== "undefined" && !!(window as unknown as { __HG_BROWSER_MOCK__?: boolean }).__HG_BROWSER_MOCK__;
+
 /** 封面：经本地协议解密（站点封面是 AES 密文）。 */
 export const cover = (url?: string, _w = 480) =>
-  url ? `${LOCAL}/img?u=${encodeURIComponent(url)}` : "";
+  !url ? "" : browserPreview() ? url : `${LOCAL}/img?u=${encodeURIComponent(url)}`;
 
 /** 播放列表：经本地协议改写分片地址，规避 CORS 与防盗链。 */
-export const playlist = (url: string) => `${LOCAL}/hls?u=${encodeURIComponent(url)}`;
+export const playlist = (url: string) =>
+  browserPreview() ? url : `${LOCAL}/hls?u=${encodeURIComponent(url)}`;
 
 /* ── 调用封装 ───────────────────────────────────────────── */
 

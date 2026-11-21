@@ -310,17 +310,23 @@ input[type="range"].hg-range::-webkit-slider-thumb { -webkit-appearance: none; w
 
 .desktop-social {
   position: absolute; right: 22px; bottom: 92px; z-index: 20;
-  display: flex; flex-direction: column; align-items: center; gap: 16px;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
 }
 .desktop-social button {
   display: flex; flex-direction: column; align-items: center; gap: 5px;
-  width: 46px; color: #e3e6ec;
+  width: 52px; color: #e3e6ec;
   transition: color .18s, transform .18s;
 }
 .desktop-social button:hover { color: #fff; transform: translateY(-2px); }
 .desktop-social button:active { transform: scale(.9); }
+.desktop-social .hg-social-icon {
+  width: 44px; height: 44px;
+  background: rgba(0, 0, 0, .34);
+}
 .desktop-social button > span:last-child {
-  font-size: 10px; font-weight: 600; color: #b1b7c2; font-variant-numeric: tabular-nums;
+  font-size: 10.5px; font-weight: 650; color: rgba(255,255,255,.88);
+  text-shadow: 0 1px 6px rgba(0,0,0,.55);
+  font-variant-numeric: tabular-nums;
 }
 
 .desktop-browse-inline {
@@ -443,7 +449,11 @@ input[type="range"].hg-range::-webkit-slider-thumb { -webkit-appearance: none; w
   background: rgba(255,255,255,.16); border-radius: 2px; overflow: hidden; transition: height .16s;
 }
 .desktop-seek-buffer { position: absolute; height: 100%; background: rgba(255,255,255,.10); }
-.desktop-seek-played { position: absolute; height: 100%; background: #80bbdf; border-radius: inherit; }
+.desktop-seek-played {
+  position: absolute; height: 100%; border-radius: inherit;
+  background: linear-gradient(90deg, #ff7a8e, #ff4d6a);
+  box-shadow: 0 0 10px rgba(255, 77, 106, .35);
+}
 .desktop-seek:hover .desktop-seek-track, .desktop-seek:focus-within .desktop-seek-track { height: 4px; }
 .desktop-seek > input {
   -webkit-appearance: none; appearance: none; position: absolute; inset: 0;
@@ -542,10 +552,138 @@ html.theme-light .article-body { color: rgba(20,24,30,.82); }
 .hg-ink-4 { color: rgba(255, 255, 255, .6); }
 .hg-gold  { color: #f3c969; }
 .hg-link  { color: #8fd0ff; }
+.hg-accent { color: #ff4d6a; }
 .hg-chip         { background: rgba(0, 0, 0, .45); color: #fff; }
 .hg-chip-strong  { background: rgba(0, 0, 0, .62); color: #fff; }
 .hg-chip:active  { background: rgba(0, 0, 0, .62); }
 .hg-ov-shadow    { text-shadow: 0 1px 8px rgba(0, 0, 0, .7); }
+
+/* —— 红果式短剧播放浮层 —— */
+.hg-player-ui {
+  --hg-player-accent: #ff4d6a;
+  --hg-player-accent-soft: rgba(255, 77, 106, .22);
+}
+.hg-social {
+  display: flex; flex-direction: column; align-items: center; gap: 18px;
+}
+.hg-social-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  width: 52px; color: #fff;
+}
+.hg-social-icon {
+  width: 46px; height: 46px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: rgba(0, 0, 0, .28);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .28), inset 0 0 0 1px rgba(255, 255, 255, .08);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  transition: transform .16s cubic-bezier(.2,0,0,1), background .16s;
+}
+.hg-social-btn:active .hg-social-icon { transform: scale(.9); background: rgba(0, 0, 0, .42); }
+.hg-social-btn.is-on .hg-social-icon { background: var(--hg-player-accent-soft); }
+.hg-social-count {
+  font-size: 11px; font-weight: 650; letter-spacing: .2px;
+  color: rgba(255, 255, 255, .92);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, .72);
+  font-variant-numeric: tabular-nums;
+}
+.hg-meta-panel {
+  padding: 0 14px 10px;
+  pointer-events: none;
+}
+.hg-meta-panel > * { pointer-events: auto; position: relative; z-index: 1; }
+.hg-meta-veil {
+  position: absolute; left: 0; right: 0; bottom: -8px; height: 210px; z-index: 0; pointer-events: none;
+  background: linear-gradient(0deg, rgba(0,0,0,.88) 0%, rgba(0,0,0,.48) 42%, transparent 100%);
+}
+.hg-author-row {
+  position: relative; display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+}
+.hg-author-name {
+  font-size: 14px; font-weight: 700; color: #fff;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, .7);
+}
+.hg-follow-btn {
+  height: 26px; padding: 0 12px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 700; letter-spacing: .2px;
+  background: var(--hg-player-accent); color: #fff;
+  box-shadow: 0 4px 14px rgba(255, 77, 106, .35);
+}
+.hg-follow-btn.is-on {
+  background: rgba(255, 255, 255, .16); color: rgba(255, 255, 255, .88);
+  box-shadow: none;
+}
+.hg-title-line {
+  position: relative;
+  font-size: 15.5px; font-weight: 700; line-height: 1.35; color: #fff;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, .75);
+  margin-bottom: 8px;
+}
+.hg-ep-row {
+  position: relative; display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+}
+.hg-ep-pill {
+  height: 26px; padding: 0 10px; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11.5px; font-weight: 700; color: #fff;
+  background: rgba(255, 255, 255, .14);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.hg-ep-cta {
+  height: 26px; padding: 0 12px; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11.5px; font-weight: 700; color: #fff;
+  background: linear-gradient(135deg, #ff5a73, #ff3d5a);
+  box-shadow: 0 4px 14px rgba(255, 61, 90, .35);
+}
+.hg-seek {
+  position: relative; height: 22px; margin: 0 2px;
+  display: flex; align-items: center; touch-action: none;
+}
+.hg-seek-track {
+  position: absolute; inset-inline: 0; height: 2.5px; border-radius: 99px;
+  background: rgba(255, 255, 255, .28); overflow: visible; transition: height .14s;
+}
+.hg-seek.is-scrubbing .hg-seek-track { height: 5px; }
+.hg-seek-played {
+  height: 100%; border-radius: inherit;
+  background: linear-gradient(90deg, #ff7a8e, #ff4d6a);
+  box-shadow: 0 0 10px rgba(255, 77, 106, .45);
+  position: relative;
+}
+.hg-seek-thumb {
+  position: absolute; right: -6px; top: 50%; width: 12px; height: 12px;
+  border-radius: 50%; background: #fff;
+  transform: translateY(-50%) scale(0);
+  box-shadow: 0 0 0 3px rgba(255, 77, 106, .35), 0 2px 8px rgba(0, 0, 0, .35);
+  transition: transform .14s cubic-bezier(.2,0,0,1);
+}
+.hg-seek.is-scrubbing .hg-seek-thumb { transform: translateY(-50%) scale(1); }
+.hg-seek-tip {
+  position: absolute; left: 50%; bottom: calc(100% + 10px);
+  transform: translateX(-50%);
+  padding: 5px 10px; border-radius: 8px;
+  background: rgba(0, 0, 0, .72); color: #fff;
+  font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+  white-space: nowrap; backdrop-filter: blur(8px);
+}
+.hg-pause-orb {
+  width: 68px; height: 68px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: rgba(0, 0, 0, .48);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14), 0 8px 28px rgba(0, 0, 0, .35);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+}
+@keyframes kf-heart-float {
+  0% { opacity: 0; transform: translate(-50%, -40%) scale(.4); }
+  18% { opacity: 1; transform: translate(-50%, -55%) scale(1.15); }
+  100% { opacity: 0; transform: translate(-50%, -140%) scale(1); }
+}
+.hg-heart-burst {
+  position: absolute; z-index: 35; pointer-events: none;
+  color: var(--hg-player-accent);
+  filter: drop-shadow(0 4px 12px rgba(255, 77, 106, .55));
+  animation: kf-heart-float .85s cubic-bezier(.2,0,0,1) forwards;
+}
 
 /* 安卓 WebView 点按会留下系统黄色焦点框，视频/底栏这类沉浸按钮一律去掉 */
 .hg-tabbar button,
