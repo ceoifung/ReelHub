@@ -142,7 +142,6 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
   const playUrl = playUrls[playKey] || "";
   useEffect(() => { videoRef.current?.trace("page.active", { active, view: mode, video_id: curId, episode: curEp, series_mode: seriesMode }); }, [active, mode, curId, curEp, seriesMode]);
   const post = posts[curId];
-  const scrollLen = seriesMode ? Math.max(seriesEps.length, 1) : videoIds.length;
 
   /* 观看进度：onTime 里每 5 秒落一次；拖动进度条期间忽略底层 timeupdate 防止进度条回跳 */
   const onTimeTick = (t: number) => {
