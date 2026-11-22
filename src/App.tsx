@@ -30,22 +30,23 @@ function TabBar() {
   const overVideo = tab === "home";
   const lightBar = !overVideo && theme === "light";
   const accent = "#3390ec";
-  const mute = lightBar ? "rgba(0,0,0,.38)" : "rgba(255,255,255,.48)";
+  const mute = lightBar ? "rgba(0,0,0,.45)" : "rgba(255,255,255,.55)";
   return (
     <nav
       className="hg-tabbar absolute bottom-0 inset-x-0 z-30"
       style={{
         paddingBottom: "var(--sab, 0px)",
         background: lightBar
-          ? "rgba(249,249,249,.86)"
+          ? "rgba(247,247,247,.92)"
           : overVideo
-            ? "rgba(10,12,16,.72)"
-            : "rgba(18,18,20,.88)",
-        borderTop: lightBar ? "0.5px solid rgba(0,0,0,.08)" : "0.5px solid rgba(255,255,255,.08)",
-        backdropFilter: "saturate(180%) blur(20px)",
-        WebkitBackdropFilter: "saturate(180%) blur(20px)",
+            ? "rgba(13,13,13,.78)"
+            : "rgba(22,22,24,.92)",
+        borderTop: lightBar ? "0.33px solid rgba(0,0,0,.12)" : "0.33px solid rgba(255,255,255,.1)",
+        backdropFilter: "saturate(180%) blur(24px)",
+        WebkitBackdropFilter: "saturate(180%) blur(24px)",
+        boxShadow: lightBar ? "0 -0.5px 0 rgba(0,0,0,.04)" : "0 -0.5px 0 rgba(255,255,255,.04)",
       }}>
-      <div className="h-[52px] flex items-stretch px-1">
+      <div className="h-[49px] flex items-stretch px-0.5">
         {items.map(({ k, label, Icon, IconOn }) => {
           const on = tab === k;
           const Ico = on ? IconOn : Icon;
@@ -53,14 +54,26 @@ function TabBar() {
             <button
               key={k}
               onClick={() => setTab(k)}
-              className="hg-tab-item flex-1 h-full flex flex-col items-center justify-center gap-[3px] pressable"
-              aria-current={on ? "page" : undefined}>
-              <Ico size={23} strokeWidth={on ? 2.1 : 1.8} style={{ color: on ? accent : mute }} />
-              <span
-                className="text-[10px] leading-none tracking-wide"
+              className="hg-tab-item flex-1 h-full flex flex-col items-center justify-center gap-[2px] pressable"
+              aria-current={on ? "page" : undefined}
+              style={{ WebkitTapHighlightColor: "transparent" }}>
+              <Ico
+                size={24}
+                strokeWidth={on ? 2.15 : 1.75}
                 style={{
-                  fontWeight: on ? 600 : 500,
                   color: on ? accent : mute,
+                  transition: "color .15s ease, transform .15s ease",
+                  transform: on ? "translateY(-0.5px)" : undefined,
+                }}
+              />
+              <span
+                className="leading-none"
+                style={{
+                  fontSize: 10,
+                  letterSpacing: "-0.01em",
+                  fontWeight: on ? 600 : 400,
+                  color: on ? accent : mute,
+                  transition: "color .15s ease",
                 }}>
                 {label}
               </span>
@@ -129,7 +142,7 @@ function AppBody() {
 
   const vis = (k: Tab) => (tab === k ? "absolute inset-0" : "absolute inset-0 invisible pointer-events-none");
   const pageActive = stack.length === 0 && !loginOpen;
-  const bottomInset = isMobile ? (fs || clean || seriesOpen ? 0 : 52) : 14;
+  const bottomInset = isMobile ? (fs || clean || seriesOpen ? 0 : 49) : 14;
   /* 栈页（从搜索/分类/我的进入的播放页、图文页）没有底栏，
      底部只让出安全区。之前多留了 20px，视频底边会露出一条
      「底栏」似的窄缝（底部的压暗渐变到不了屏幕最底）。 */
