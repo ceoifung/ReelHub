@@ -18,39 +18,49 @@ import ResizeHandles from "./components/ResizeHandles";
 import { tracePlayback } from "./playbackDiagnostics";
 import { IGrid, IGridF, IHome, IHomeF, ISearch, IUser, IUserF, Logo } from "./icons";
 
-/* ============ 底部标签栏（Android）—— 细瘦纯文字、低侵入 ============ */
+/* ============ 底部标签栏（Telegram 风格：图标 + 文案 + 毛玻璃） ============ */
 function TabBar() {
   const { tab, setTab, theme } = useStore();
-  const items: { k: Tab; label: string }[] = [
-    { k: "home", label: "首页" },
-    { k: "search", label: "搜索" },
-    { k: "category", label: "分类" },
-    { k: "profile", label: "我的" },
+  const items: { k: Tab; label: string; Icon: typeof IHome; IconOn: typeof IHomeF }[] = [
+    { k: "home", label: "首页", Icon: IHome, IconOn: IHomeF },
+    { k: "search", label: "搜索", Icon: ISearch, IconOn: ISearch },
+    { k: "category", label: "分类", Icon: IGrid, IconOn: IGridF },
+    { k: "profile", label: "我的", Icon: IUser, IconOn: IUserF },
   ];
-  /* 细瘦纯文字分栏：只有选中项高亮，没有指示点。
-     首页是沉浸视频 → 底栏压深色；搜索/分类/我的 是浅色内容页 →
-     浅色主题下底栏跟着换成浅色，深色主题保持深色。 */
   const overVideo = tab === "home";
   const lightBar = !overVideo && theme === "light";
+  const accent = "#3390ec";
+  const mute = lightBar ? "rgba(0,0,0,.38)" : "rgba(255,255,255,.48)";
   return (
-    <nav className="hg-tabbar absolute bottom-0 inset-x-0 z-30"
+    <nav
+      className="hg-tabbar absolute bottom-0 inset-x-0 z-30"
       style={{
         paddingBottom: "var(--sab, 0px)",
-        background: lightBar ? "rgba(250, 250, 250, .97)" : overVideo ? "#000000" : "#141414",
-        borderTop: lightBar ? "1px solid rgba(0,0,0,.08)" : overVideo ? "none" : "1px solid rgba(255,255,255,.07)",
-        boxShadow: lightBar ? "0 -2px 14px rgba(0,0,0,.05)" : "none",
+        background: lightBar
+          ? "rgba(249,249,249,.86)"
+          : overVideo
+            ? "rgba(10,12,16,.72)"
+            : "rgba(18,18,20,.88)",
+        borderTop: lightBar ? "0.5px solid rgba(0,0,0,.08)" : "0.5px solid rgba(255,255,255,.08)",
+        backdropFilter: "saturate(180%) blur(20px)",
+        WebkitBackdropFilter: "saturate(180%) blur(20px)",
       }}>
-      <div className="h-[40px] flex items-center px-1">
-        {items.map(({ k, label }) => {
+      <div className="h-[52px] flex items-stretch px-1">
+        {items.map(({ k, label, Icon, IconOn }) => {
           const on = tab === k;
+          const Ico = on ? IconOn : Icon;
           return (
-            <button key={k} onClick={() => setTab(k)} className="flex-1 h-full flex items-center justify-center pressable">
-              <span className="text-[12.5px] leading-none transition-colors duration-200"
+            <button
+              key={k}
+              onClick={() => setTab(k)}
+              className="hg-tab-item flex-1 h-full flex flex-col items-center justify-center gap-[3px] pressable"
+              aria-current={on ? "page" : undefined}>
+              <Ico size={23} strokeWidth={on ? 2.1 : 1.8} style={{ color: on ? accent : mute }} />
+              <span
+                className="text-[10px] leading-none tracking-wide"
                 style={{
-                  fontWeight: on ? 700 : 400,
-                  color: lightBar
-                    ? (on ? "var(--p-primary)" : "rgba(0,0,0,.45)")
-                    : (on ? "#ffffff" : "rgba(255,255,255,.6)"),
+                  fontWeight: on ? 600 : 500,
+                  color: on ? accent : mute,
                 }}>
                 {label}
               </span>
@@ -83,7 +93,7 @@ function StackPage({ page, onBack, wide, top, bottomInset }: {
 
 /* ============ 应用主体 ============ */
 function AppBody() {
-  const { platform, tab, setTab, stack, pop, loginOpen, setLoginOpen, fs, clean } = useStore();
+  const { platform, tab, setTab, stack, pop, loginOpen, setLoginOpen, fs, clean, seriesOpen } = useStore();
   const isMobile = platform === "android" || platform === "ios";
   const mainRef = useRef<HTMLDivElement>(null);
   const [wide, setWide] = useState(!isMobile);
@@ -119,7 +129,7 @@ function AppBody() {
 
   const vis = (k: Tab) => (tab === k ? "absolute inset-0" : "absolute inset-0 invisible pointer-events-none");
   const pageActive = stack.length === 0 && !loginOpen;
-  const bottomInset = isMobile ? (fs || clean ? 0 : 40) : 14;
+  const bottomInset = isMobile ? (fs || clean || seriesOpen ? 0 : 52) : 14;
   /* 栈页（从搜索/分类/我的进入的播放页、图文页）没有底栏，
      底部只让出安全区。之前多留了 20px，视频底边会露出一条
      「底栏」似的窄缝（底部的压暗渐变到不了屏幕最底）。 */
@@ -140,7 +150,7 @@ function AppBody() {
           </div>
         ))}
 
-        {isMobile && !fs && !clean && stack.length === 0 && <TabBar />}
+        {isMobile && !fs && !clean && !seriesOpen && stack.length === 0 && <TabBar />}
       </div>
     </div>
   );

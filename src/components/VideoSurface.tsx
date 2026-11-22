@@ -22,6 +22,8 @@ type Props = {
   poster?: string;
   autoPlay?: boolean;
   active?: boolean;
+  /** 仅预缓冲：拉清单与前几片，不自动播放（用于无缝切集） */
+  warm?: boolean;
   diagnosticContext?: Record<string, unknown>;
   muted?: boolean;
   loop?: boolean;
@@ -48,7 +50,7 @@ type Props = {
 
 /** 只负责「播」：hls.js + video 元素，控制条由外层渲染。 */
 const VideoSurface = forwardRef<VideoHandle, Props>(function VideoSurface(
-  { src, poster, autoPlay = true, active = true, diagnosticContext = {}, muted = false, loop = false, fit = "contain",
+  { src, poster, autoPlay = true, active = true, warm = false, diagnosticContext = {}, muted = false, loop = false, fit = "contain",
     scale = 1, panX = 0, panY = 0, isGesturing = false,
     volume = 1, rate = 1,
     onTime, onDuration, onSize, onPlaying, onPause, onWaiting, onEnded, onError, onClick, className = "" },
@@ -213,7 +215,8 @@ const VideoSurface = forwardRef<VideoHandle, Props>(function VideoSurface(
       hls.loadSource(url);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        if (activity.isActive()) hls.startLoad();
+        /* active 播放 或 warm 预缓冲：都开始拉片，避免切集才冷启动 */
+        if (activity.isActive() || warm) hls.startLoad();
         if (autoPlay) activity.play("manifest_autoplay", true);
       });
       hls.on(Hls.Events.FRAG_BUFFERED, () => {

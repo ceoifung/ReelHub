@@ -10,7 +10,26 @@ export function usePlaybackActivity(
   const wanted = useRef(autoPlay);
   const mounted = useRef(true);
   const previous = useRef(active);
-  useLayoutEffect(() => { wanted.current = autoPlay; }, [src, autoPlay]);
+  useLayoutEffect(() => {
+    const wasWanted = wanted.current;
+    wanted.current = autoPlay;
+    const v = videoRef.current;
+    const hls = hlsRef.current;
+    /* 当前集降为邻接预热：停播但继续保留缓冲，便于再滑回来 */
+    if (!autoPlay && wasWanted) {
+      latest.current.trace("pause.request", { source: "autoplay_demote" });
+      v?.pause();
+      return;
+    }
+    /* 预加载槽位升级为当前集时：autoPlay false→true，主动开播 */
+    if (autoPlay && !wasWanted && latest.current.active) {
+      if (hls?.levels.length && !hls.loadingEnabled) hls.startLoad(v?.currentTime || 0);
+      if (v && (hls?.levels.length || v.readyState > 0)) {
+        latest.current.trace("play.request", { source: "autoplay_promote" });
+        v.play().catch((e) => latest.current.trace("play.rejected", { source: "autoplay_promote", error_name: e?.name }));
+      }
+    }
+  }, [src, autoPlay]);
 
   const play = useCallback((source: string, automatic = false) => {
     const v = videoRef.current;

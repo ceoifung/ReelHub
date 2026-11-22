@@ -123,6 +123,8 @@ type Store = {
   fs: boolean; setFs: (v: boolean | ((p: boolean) => boolean)) => void;
   /** 清屏模式（单击屏幕消除所有控件，只保留纯视频内容） */
   clean: boolean; setClean: (v: boolean | ((p: boolean) => boolean)) => void;
+  /** 全集播放模式：隐藏底栏，沉浸连播 */
+  seriesOpen: boolean; setSeriesOpen: (v: boolean) => void;
   muted: boolean; setMuted: (v: boolean | ((p: boolean) => boolean)) => void;
   muteOnStartup: boolean; setMuteOnStartup: (on: boolean) => void;
   volume: number; setVolume: (v: number) => void;
@@ -146,6 +148,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [theater, setTheaterState] = useState(false);
   const [fs, setFsState] = useState(false);
   const [clean, setCleanState] = useState(false);
+  const [seriesOpen, setSeriesOpen] = useState(false);
   const [strictSecurity, setStrictSecurityState] = useState<boolean>(isStrictSecurity);
   const [cliRelaxed, setCliRelaxed] = useState(false);
   const [strictSecurityReady, setStrictSecurityReady] = useState(false);
@@ -193,13 +196,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 2200);
   }, []);
 
-  const setTab = useCallback((t: Tab) => { setTabRaw(t); setStack([]); setCleanState(false); }, []);
+  const setTab = useCallback((t: Tab) => { setTabRaw(t); setStack([]); setCleanState(false); setSeriesOpen(false); }, []);
   const push = useCallback((pg: PageInput) => {
     setCleanState(false);
+    setSeriesOpen(false);
     setStack((s) => [...s, { ...pg, key: `p${++seq}` } as Page]);
   }, []);
   const pop = useCallback(() => {
     setCleanState(false);
+    setSeriesOpen(false);
     setStack((s) => s.slice(0, -1));
   }, []);
 
@@ -296,7 +301,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     isFav: (id) => p.favs.includes(id),
     toggleLikeLocal, toggleFavLocal, toggleFollowLocal, addHistory, clearHistory,
     muted: p.muted, setMuted, volume: p.volume, setVolume,
-    theater, setTheater, fs, setFs, clean, setClean,
+    theater, setTheater, fs, setFs, clean, setClean, seriesOpen, setSeriesOpen,
     muteOnStartup: p.muteOnStartup, setMuteOnStartup,
     searchHist: p.searchHist, addSearch, clearSearchHist,
     strictSecurity, strictSecurityReady, securityPending, cliRelaxed, setStrictSecurity,
@@ -304,7 +309,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }), [theme, tab, setTab, stack, push, pop, user, loginOpen, logout,
     p, toggleLikeLocal, toggleFavLocal, toggleFollowLocal, addHistory, clearHistory,
     setMuted, setMuteOnStartup, setVolume, addSearch, clearSearchHist, strictSecurity, strictSecurityReady, securityPending, cliRelaxed, setStrictSecurity,
-    toasts, toast, theater, setTheater, fs, setFs, clean, setClean]);
+    toasts, toast, theater, setTheater, fs, setFs, clean, setClean, seriesOpen, setSeriesOpen]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

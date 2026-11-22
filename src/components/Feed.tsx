@@ -31,7 +31,7 @@ type Props = {
 
 export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind = "video", active, bottomInset, onBack, onNearEnd, startEp, startTime }: Props) {
   const store = useStore();
-  const { isLiked, isFav, toggleLikeLocal, toggleFavLocal, toggleFollowLocal, muted, setMuted, volume, setVolume, toast, addHistory, user, setLoginOpen } = store;
+  const { isLiked, isFav, toggleLikeLocal, toggleFavLocal, toggleFollowLocal, muted, setMuted, volume, setVolume, toast, addHistory, user, setLoginOpen, setSeriesOpen } = store;
   const isDesktop = !isMobile;
 
   const boxRef = useRef<HTMLDivElement>(null);
@@ -42,6 +42,10 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
   const [playUrls, setPlayUrls] = useState<Record<string, string>>({});
   const [cards] = useState<Record<number, VideoCard>>({});
   const [posts, setPosts] = useState<Record<number, Post>>({});
+  /* 红果式全集模式：锁定一部剧，上下滑切换集数 */
+  const [seriesMode, setSeriesMode] = useState(false);
+  const [seriesVideoId, setSeriesVideoId] = useState<number | null>(null);
+  const [epIndex, setEpIndex] = useState(0);
 
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -127,14 +131,18 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
     mode: "idle" | "hold" | "scrub" | "pan"; base: number; width: number; playing: boolean;
   } | null>(null);
 
-  const curId = videoIds[index];
+  const seriesEps = (seriesVideoId != null ? details[seriesVideoId]?.episodes : undefined) || [];
+  const curId = seriesMode && seriesVideoId != null ? seriesVideoId : videoIds[index];
   const detail = details[curId];
-  const curEp = epMap[curId] || 1;
+  const episodes = detail?.episodes || [];
+  const curEp = seriesMode
+    ? (seriesEps[epIndex]?.ep_num || epMap[curId] || 1)
+    : (epMap[curId] || 1);
   const playKey = `${curId}:${curEp}`;
   const playUrl = playUrls[playKey] || "";
-  useEffect(() => { videoRef.current?.trace("page.active", { active, view: mode, video_id: curId, episode: curEp }); }, [active, mode, curId, curEp]);
-  const episodes = detail?.episodes || [];
+  useEffect(() => { videoRef.current?.trace("page.active", { active, view: mode, video_id: curId, episode: curEp, series_mode: seriesMode }); }, [active, mode, curId, curEp, seriesMode]);
   const post = posts[curId];
+  const scrollLen = seriesMode ? Math.max(seriesEps.length, 1) : videoIds.length;
 
   /* 观看进度：onTime 里每 5 秒落一次；拖动进度条期间忽略底层 timeupdate 防止进度条回跳 */
   const onTimeTick = (t: number) => {
@@ -286,7 +294,7 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
 
   /* 全屏切换或视口旋转后校准滚动容器 scrollTop：
      - 进入全屏时非当前项已隐藏，当前项位于顶部 scrollTop = 0；
-     - 退出全屏回到竖屏列表时，立即将 scrollTop 重新对齐到 index * clientHeight，防止错位到其它视频封面。 */
+     - 退出全屏回到竖屏列表时，立即将 scrollTop 重新对齐到当前槽位，防止错位。 */
   useEffect(() => {
     const el = boxRef.current;
     if (!el) return undefined;
@@ -294,10 +302,11 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
       el.scrollTop = 0;
       return undefined;
     }
+    const slot = seriesMode ? epIndex : index;
     const syncScroll = () => {
       const box = boxRef.current;
       if (!box || fs) return;
-      box.scrollTop = index * (box.clientHeight || 1);
+      box.scrollTop = slot * (box.clientHeight || 1);
     };
     syncScroll();
     const raf = requestAnimationFrame(syncScroll);
@@ -308,7 +317,7 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
       window.clearTimeout(t1);
       window.clearTimeout(t2);
     };
-  }, [fs, vpLandscape, index]);
+  }, [fs, vpLandscape, index, epIndex, seriesMode]);
 
   /* 滚动定位（全屏或缩放手势期间锁定索引，避免容器尺寸变化误触发翻页） */
   const onScroll = useCallback(() => {
@@ -316,17 +325,29 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
     const el = boxRef.current;
     if (!el) return;
     const h = el.clientHeight || 1;
-    const i = Math.max(0, Math.min(videoIds.length - 1, Math.round(el.scrollTop / h)));
+    const len = seriesMode ? Math.max(seriesEps.length, 1) : videoIds.length;
+    const i = Math.max(0, Math.min(len - 1, Math.round(el.scrollTop / h)));
+    if (seriesMode) {
+      setEpIndex((prev) => {
+        if (prev === i) return prev;
+        const ep = seriesEps[i]?.ep_num;
+        if (ep && seriesVideoId != null) setEpMap((m) => ({ ...m, [seriesVideoId]: ep }));
+        return i;
+      });
+      return;
+    }
     setIndex((prev) => (prev === i ? prev : i));
     if (onNearEnd && i >= videoIds.length - 3) onNearEnd();
-  }, [videoIds.length, onNearEnd, fs]);
+  }, [videoIds.length, onNearEnd, fs, seriesMode, seriesEps, seriesVideoId]);
 
   const go = useCallback((delta: number) => {
     const el = boxRef.current;
     if (!el) return;
-    const next = Math.max(0, Math.min(videoIds.length - 1, index + delta));
+    const cur = seriesMode ? epIndex : index;
+    const len = seriesMode ? Math.max(seriesEps.length, 1) : videoIds.length;
+    const next = Math.max(0, Math.min(len - 1, cur + delta));
     el.scrollTo({ top: next * el.clientHeight, behavior: "smooth" });
-  }, [index, videoIds.length]);
+  }, [index, epIndex, videoIds.length, seriesMode, seriesEps.length]);
 
   /* 初始定位 */
   useEffect(() => {
@@ -363,22 +384,50 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind, index, videoIds]);
 
-  /* 拉播放地址 */
+  /* 拉播放地址 + 预取后续几集 / 邻接剧，保证切换更顺 */
   useEffect(() => {
     if (!curId) return;
-    if (playUrls[playKey]) return;
     let alive = true;
-    api.play(curId, curEp)
-      .then((info) => {
-        if (!alive) return;
-        if (!info?.video_url) throw new Error("暂无播放地址");
-        setPlayUrls((m) => ({ ...m, [playKey]: info.video_url }));
-        addHistory(curId, curEp);
-      })
-      .catch((e) => { if (alive) setErr((e as Error).message || "取播放地址失败"); });
+    const targets: { id: number; ep: number; critical?: boolean }[] = [];
+    if (seriesMode && seriesEps.length) {
+      for (const off of [0, 1, 2, -1]) {
+        const ep = seriesEps[epIndex + off];
+        if (ep) targets.push({ id: curId, ep: ep.ep_num, critical: off === 0 });
+      }
+    } else {
+      targets.push({ id: curId, ep: curEp, critical: true });
+      const nextEp = episodes.find((e) => e.ep_num === curEp + 1);
+      if (nextEp) targets.push({ id: curId, ep: nextEp.ep_num });
+      const nextEp2 = episodes.find((e) => e.ep_num === curEp + 2);
+      if (nextEp2) targets.push({ id: curId, ep: nextEp2.ep_num });
+      [videoIds[index + 1], videoIds[index + 2]].filter(Boolean).forEach((id) => {
+        const ep = epMap[id] || 1;
+        targets.push({ id, ep });
+      });
+    }
+    targets.forEach(({ id, ep, critical }) => {
+      const key = `${id}:${ep}`;
+      if (playUrls[key]) {
+        if (critical && id === curId && ep === curEp) addHistory(id, ep);
+        return;
+      }
+      api.play(id, ep)
+        .then((info) => {
+          if (!alive) return;
+          if (!info?.video_url) {
+            if (critical) throw new Error("暂无播放地址");
+            return;
+          }
+          setPlayUrls((m) => (m[key] ? m : { ...m, [key]: info.video_url }));
+          if (critical) addHistory(id, ep);
+        })
+        .catch((e) => {
+          if (alive && critical) setErr((e as Error).message || "取播放地址失败");
+        });
+    });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [curId, curEp, playTry]);
+  }, [curId, curEp, playTry, seriesMode, epIndex, index, seriesEps.length, episodes.length]);
 
   /* 切换条目/集数时重置播放与缩放状态 */
   useEffect(() => {
@@ -393,8 +442,9 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
     setZoom({ scale: 1, x: 0, y: 0, gesturing: false });
     if (!fs && boxRef.current) {
       const el = boxRef.current;
+      const slot = seriesMode ? epIndex : index;
       requestAnimationFrame(() => {
-        el.scrollTop = index * (el.clientHeight || 1);
+        el.scrollTop = slot * (el.clientHeight || 1);
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -442,12 +492,20 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, controlsLocked, panel, time, index]);
 
-  /* 安卓返回键：面板打开时先关面板 */
+  /* 安卓返回键：面板 → 退出全集模式 → 退栈 */
   useEffect(() => {
-    if (!panel) { setBackHandler(null); return undefined; }
-    setBackHandler(() => { setPanel(null); return true; });
-    return () => setBackHandler(null);
-  }, [panel]);
+    if (panel) {
+      setBackHandler(() => { setPanel(null); return true; });
+      return () => setBackHandler(null);
+    }
+    if (seriesMode) {
+      setBackHandler(() => { exitSeries(); return true; });
+      return () => setBackHandler(null);
+    }
+    setBackHandler(null);
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panel, seriesMode]);
 
   useEffect(() => {
     const onFs = () => setFullscreen(!!document.fullscreenElement);
@@ -782,9 +840,75 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
     if (requireLogin()) api.follow(uid, on).catch(() => {});
   };
 
+  const scrollToSlot = (slot: number) => {
+    const el = boxRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      el.scrollTop = slot * (el.clientHeight || 1);
+    });
+  };
+
+  const enterSeries = (ep?: number) => {
+    if (kind !== "video" || !curId) return;
+    const eps = details[curId]?.episodes || [];
+    if (!eps.length) {
+      setPanel("episodes");
+      return;
+    }
+    const target = ep || curEp || eps[0].ep_num;
+    const ei = Math.max(0, eps.findIndex((e) => e.ep_num === target));
+    setSeriesVideoId(curId);
+    setSeriesMode(true);
+    setSeriesOpen(true);
+    setEpIndex(ei);
+    setEpMap((m) => ({ ...m, [curId]: target }));
+    setPanel(null);
+    setClean(false);
+    scrollToSlot(ei);
+  };
+
+  const exitSeries = () => {
+    const id = seriesVideoId;
+    setSeriesMode(false);
+    setSeriesVideoId(null);
+    setSeriesOpen(false);
+    if (id != null) {
+      const vi = videoIds.indexOf(id);
+      if (vi >= 0) {
+        setIndex(vi);
+        scrollToSlot(vi);
+      }
+    }
+  };
+
+  /* 卸载时清掉全集底栏状态 */
+  useEffect(() => () => { setSeriesOpen(false); }, [setSeriesOpen]);
+
   const pickEp = (ep: number) => {
     setEpMap((m) => ({ ...m, [curId]: ep }));
     setPanel(null);
+    if (seriesMode) {
+      const ei = Math.max(0, episodes.findIndex((e) => e.ep_num === ep));
+      setEpIndex(ei);
+      scrollToSlot(ei);
+      return;
+    }
+    /* 从选集面板点选 → 进入全集模式，便于继续上下滑连播 */
+    enterSeries(ep);
+  };
+
+  const playNextEpisode = () => {
+    if (seriesMode) {
+      if (epIndex < seriesEps.length - 1) go(1);
+      return;
+    }
+    const next = episodes.find((e) => e.ep_num === curEp + 1);
+    if (next) {
+      /* 首页信息流里播完自动进全集模式并切下一集 */
+      enterSeries(next.ep_num);
+      return;
+    }
+    go(1);
   };
 
   const likeCount = useMemo(() => {
@@ -802,6 +926,23 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
       ? (fs || vpLandscape ? "contain" : portraitFit)
       : (vpLandscape ? "contain" : "cover");
 
+  /* 信息流槽位：普通模式按剧目；全集模式按集数上下滑 */
+  const slots: { key: string; vid: number; ep?: number; i: number }[] = seriesMode && seriesEps.length
+    ? seriesEps.map((ep, i) => ({ key: `ep-${seriesVideoId}-${ep.ep_num}`, vid: seriesVideoId!, ep: ep.ep_num, i }))
+    : videoIds.map((vid, i) => ({ key: `vid-${vid}`, vid, i }));
+  const activeSlot = seriesMode ? epIndex : index;
+  const slotCount = slots.length;
+  const canGoPrev = activeSlot > 0;
+  const canGoNext = activeSlot < slotCount - 1;
+  const counterLabel = seriesMode
+    ? `${epIndex + 1} / ${Math.max(seriesEps.length, 1)}`
+    : `${index + 1} / ${videoIds.length}`;
+
+  const handleBack = () => {
+    if (seriesMode) { exitSeries(); return; }
+    onBack?.();
+  };
+
   return (
     <div
       className={`hg-player-ui absolute inset-0 overflow-hidden bg-black player-root ${controlsLocked ? "is-locked" : ""} ${isDesktop ? "player-surface" : ""} ${theater ? "is-theater" : ""} ${isDesktop && idle ? "is-idle" : ""}`}
@@ -817,51 +958,59 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
       <div ref={boxRef} onScroll={onScroll}
         className={`absolute inset-y-0 left-0 no-bar ${fs ? "overflow-hidden" : "overflow-y-scroll snap-y snap-mandatory overscroll-y-contain"}`}
         style={{ right: isDesktop && panel ? 372 : 0, transition: "right .3s cubic-bezier(.2,0,0,1)" }}>
-        {videoIds.map((vid, i) => {
-          const isActive = i === index;
+        {slots.map(({ key, vid, ep, i }) => {
+          const isActive = i === activeSlot;
+          const near = Math.abs(i - activeSlot) <= 1;
+          const slotEp = ep ?? (seriesMode ? undefined : (epMap[vid] || 1));
+          const slotUrl = slotEp != null ? (playUrls[`${vid}:${slotEp}`] || "") : (isActive ? playUrl : "");
+          const slotPoster = cover(
+            cards[vid]?.cover || posts[vid]?.cover || details[vid]?.cover || (isActive ? meta.cover : "") || "",
+            900,
+          );
           return (
             <section
-              key={vid}
+              key={key}
               style={!isActive && fs ? { display: "none" } : undefined}
               className={`relative w-full h-full snap-start snap-always ${fs && isActive ? "" : "overflow-hidden"}`}>
-              {isActive && playUrl ? (
-                <div className={rotated ? "fs-landscape" : (!isDesktop && fs ? "fs-immersive" : "absolute inset-0")}>
+              {near && slotUrl ? (
+                <div className={isActive ? (rotated ? "fs-landscape" : (!isDesktop && fs ? "fs-immersive" : "absolute inset-0")) : "absolute inset-0"}>
                   <div
                     className="absolute inset-0 overflow-hidden"
-                    style={{ touchAction: fs || zoom.scale > 1.05 ? "none" : "pan-y" }}
-                    onTouchStart={onTouchStart}
-                    onTouchMove={onTouchMove}
-                    onTouchEnd={onTouchEnd}
-                    onTouchCancel={onTouchEnd}
-                    onPointerDown={onDown}
-                    onPointerMove={onMove}
-                    onPointerUp={(e) => onUp(e, false)}
-                    onPointerCancel={(e) => onUp(e, true)}
-                    onLostPointerCapture={(e) => onUp(e, true)}>
+                    style={{ touchAction: isActive && (fs || zoom.scale > 1.05) ? "none" : "pan-y" }}
+                    onTouchStart={isActive ? onTouchStart : undefined}
+                    onTouchMove={isActive ? onTouchMove : undefined}
+                    onTouchEnd={isActive ? onTouchEnd : undefined}
+                    onTouchCancel={isActive ? onTouchEnd : undefined}
+                    onPointerDown={isActive ? onDown : undefined}
+                    onPointerMove={isActive ? onMove : undefined}
+                    onPointerUp={isActive ? ((e) => onUp(e, false)) : undefined}
+                    onPointerCancel={isActive ? ((e) => onUp(e, true)) : undefined}
+                    onLostPointerCapture={isActive ? ((e) => onUp(e, true)) : undefined}>
                     <VideoSurface
-                      ref={videoRef}
-                      src={playUrl}
-                      poster={fs ? undefined : posterUrl}
-                      autoPlay
-                      active={active}
-                      diagnosticContext={{ active, view: mode, kind, video_id: curId, episode: curEp }}
-                      muted={muted}
-                      volume={volume}
-                      rate={effRate}
-                      fit={effectiveFit}
-                      scale={zoom.scale}
-                      panX={zoom.x}
-                      panY={zoom.y}
-                      isGesturing={zoom.gesturing}
-                      onClick={() => { if (isDesktop) videoRef.current?.toggle(); }}
-                      onTime={onTimeTick}
-                      onDuration={onDurationTick}
-                      onSize={(w, h) => setVsize({ w, h })}
-                      onPlaying={() => { setPaused(false); setWaiting(false); setErr(""); }}
-                      onPause={() => setPaused(true)}
-                      onWaiting={() => setWaiting(true)}
-                      onEnded={() => { const next = episodes.find((e) => e.ep_num === curEp + 1); if (next) pickEp(next.ep_num); }}
-                      onError={(m) => setErr(m)}
+                      ref={isActive ? videoRef : undefined}
+                      src={slotUrl}
+                      poster={fs && isActive ? undefined : slotPoster}
+                      autoPlay={isActive}
+                      active={active && near}
+                      warm={!isActive}
+                      diagnosticContext={{ active, view: mode, kind, video_id: vid, episode: slotEp, series_mode: seriesMode, warm: !isActive }}
+                      muted={muted || !isActive}
+                      volume={isActive ? volume : 0}
+                      rate={isActive ? effRate : 1}
+                      fit={isActive ? effectiveFit : "contain"}
+                      scale={isActive ? zoom.scale : 1}
+                      panX={isActive ? zoom.x : 0}
+                      panY={isActive ? zoom.y : 0}
+                      isGesturing={isActive && zoom.gesturing}
+                      onClick={isActive ? (() => { if (isDesktop) videoRef.current?.toggle(); }) : undefined}
+                      onTime={isActive ? onTimeTick : undefined}
+                      onDuration={isActive ? onDurationTick : undefined}
+                      onSize={isActive ? ((w, h) => setVsize({ w, h })) : undefined}
+                      onPlaying={isActive ? (() => { setPaused(false); setWaiting(false); setErr(""); }) : undefined}
+                      onPause={isActive ? (() => setPaused(true)) : undefined}
+                      onWaiting={isActive ? (() => setWaiting(true)) : undefined}
+                      onEnded={isActive ? playNextEpisode : undefined}
+                      onError={isActive ? ((m) => setErr(m)) : undefined}
                     />
                   </div>
 
@@ -983,7 +1132,7 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
                 </div>
               ) : (
                 <div className="absolute inset-0">
-                  <Img src={cards[vid]?.cover || posts[vid]?.cover || details[vid]?.cover || (isActive ? detail?.cover : "") || ""} eager={Math.abs(i - index) <= 1} />
+                  <Img src={cards[vid]?.cover || posts[vid]?.cover || details[vid]?.cover || (isActive ? detail?.cover : "") || ""} eager={Math.abs(i - activeSlot) <= 1} />
                   <div className="absolute inset-0" style={{ background: "rgba(0,0,0,.25)" }} />
                 </div>
               )}
@@ -1062,19 +1211,19 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
                 </div>
               )}
 
-              {/* 顶部 */}
-              {!fs && !clean && mode === "context" ? (
+              {/* 顶部：上下文页 / 全集模式返回 */}
+              {!fs && !clean && (mode === "context" || seriesMode) ? (
                 isDesktop ? (
                   <div className="desktop-context-header">
-                    <button onClick={onBack} aria-label="返回"><IBack size={17} /></button>
-                    <span>{title}</span>
-                    <small>{index + 1} / {videoIds.length}</small>
+                    <button onClick={handleBack} aria-label="返回"><IBack size={17} /></button>
+                    <span>{seriesMode ? (meta.title || title || "全集播放") : title}</span>
+                    <small>{counterLabel}</small>
                   </div>
                 ) : (
                   <div className="absolute inset-x-0 z-20 flex items-center gap-2 px-2.5" style={{ top: "calc(var(--sat, 0px) + 8px)", paddingRight: 148 }}>
-                    <button onClick={onBack} aria-label="返回" className="hg-chip w-9 h-9 rounded-full flex items-center justify-center pressable elev-1"><IBack size={20} /></button>
-                    <span className="text-[14.5px] font-semibold hg-ink hg-ov-shadow truncate">{title}</span>
-                    <span className="ml-auto px-2 py-0.5 rounded-full hg-chip text-[11px] font-semibold" style={{ color: "rgba(255,255,255,.9)" }}>{index + 1} / {videoIds.length}</span>
+                    <button onClick={handleBack} aria-label="返回" className="hg-chip w-9 h-9 rounded-full flex items-center justify-center pressable elev-1"><IBack size={20} /></button>
+                    <span className="text-[14.5px] font-semibold hg-ink hg-ov-shadow truncate">{seriesMode ? (meta.title || "全集播放") : title}</span>
+                    <span className="ml-auto px-2 py-0.5 rounded-full hg-chip text-[11px] font-semibold" style={{ color: "rgba(255,255,255,.9)" }}>{counterLabel}</span>
                   </div>
                 )
               ) : null}
@@ -1118,13 +1267,13 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
               {!fs && isDesktop && (
               <div className="absolute z-20 flex flex-col items-center desktop-social">
                 <div className="desktop-browse-inline">
-                  <button onClick={() => go(-1)} disabled={index === 0} aria-label="上一个" title="上一个 ↑">
+                  <button onClick={() => go(-1)} disabled={!canGoPrev} aria-label="上一个" title="上一个 ↑">
                     <IChevronUp size={19} strokeWidth={1.8} />
                   </button>
-                  <button onClick={() => go(1)} disabled={index >= videoIds.length - 1} aria-label="下一个" title="下一个 ↓">
+                  <button onClick={() => go(1)} disabled={!canGoNext} aria-label="下一个" title="下一个 ↓">
                     <IChevronDown size={19} strokeWidth={1.8} />
                   </button>
-                  <small>{String(index + 1).padStart(2, "0")} / {String(videoIds.length).padStart(2, "0")}</small>
+                  <small>{String(activeSlot + 1).padStart(2, "0")} / {String(slotCount).padStart(2, "0")}</small>
                 </div>
 
                 {kind === "video" && (
@@ -1176,8 +1325,8 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
                     </button>
                   )}
                   {episodes.length > 0 && (
-                    <button type="button" onClick={() => setPanel("episodes")} className="hg-ep-cta pressable" style={{ height: 24, fontSize: 11 }}>
-                      第 {curEp}/{episodes.length} 集 <IChevR size={11} />
+                    <button type="button" onClick={() => (seriesMode ? setPanel("episodes") : enterSeries())} className="hg-ep-cta pressable" style={{ height: 24, fontSize: 11 }}>
+                      {seriesMode ? `第 ${curEp}/${episodes.length} 集` : `查看全集 · ${episodes.length}集`} <IChevR size={11} />
                     </button>
                   )}
                   {!!meta.score && (
@@ -1216,12 +1365,17 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
                   <div className="hg-ep-row">
                     {kind === "video" && (
                       <>
-                        <button type="button" onClick={() => setPanel("detail")} className="hg-ep-pill pressable">
+                        <button type="button" onClick={() => setPanel(seriesMode ? "episodes" : "detail")} className="hg-ep-pill pressable">
                           第 {curEp}{episodes.length ? ` / ${episodes.length}` : ""} 集
                         </button>
-                        <button type="button" onClick={() => setPanel("episodes")} className="hg-ep-cta pressable">
+                        <button
+                          type="button"
+                          onClick={() => (seriesMode ? setPanel("episodes") : enterSeries())}
+                          className="hg-ep-cta pressable">
                           <IList size={12} />
-                          {episodes.length ? `全${episodes.length}集` : "选集"}
+                          {seriesMode
+                            ? "选集"
+                            : (episodes.length ? `查看全集 · ${episodes.length}集` : "选集")}
                           <IChevR size={11} />
                         </button>
                       </>
@@ -1274,8 +1428,8 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
           visible={active && !idle}
           seekEnabled={active && !controlsLocked}
           seekKey={playKey}
-          nextDisabled={!episodes.some((e) => e.ep_num === curEp + 1) && index >= videoIds.length - 1}
-          nextTitle={episodes.some((e) => e.ep_num === curEp + 1) ? "下一集 E" : "下一部 ↓"}
+          nextDisabled={seriesMode ? epIndex >= seriesEps.length - 1 : (!episodes.some((e) => e.ep_num === curEp + 1) && index >= videoIds.length - 1)}
+          nextTitle={seriesMode || episodes.some((e) => e.ep_num === curEp + 1) ? "下一集 ↓" : "下一部 ↓"}
           onToggle={() => videoRef.current?.toggle()}
           onSeek={(t, source) => { videoRef.current?.seek(t, source); setTime(t); }}
           onSeekInteraction={(phase, input, target, pointerTarget) => videoRef.current?.trace(`seek.input.${phase}`, { input, target, pointer_target: pointerTarget })}
@@ -1286,11 +1440,7 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
           onLock={lockControls}
           onTheater={() => setTheater((v) => !v)}
           onFullscreen={toggleFull}
-          onNext={() => {
-            const nx = episodes.find((e) => e.ep_num === curEp + 1);
-            if (nx) pickEp(nx.ep_num);
-            else go(1);
-          }}
+          onNext={playNextEpisode}
         />
       )}
 
