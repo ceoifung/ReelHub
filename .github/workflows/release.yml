@@ -81,9 +81,9 @@ jobs:
           path: artifacts/*
           if-no-files-found: error
 
-  # ================= Android：仅 arm64-v8a + 签名 =================
+  # ================= Android：按 ABI 分包 + 签名 =================
   android:
-    name: Android (arm64-v8a)
+    name: Android (split per ABI)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -127,19 +127,19 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
-          key: android-arm64
+          key: android
 
       - run: pnpm install --frozen-lockfile
 
       - name: 生成 Android 工程
         run: pnpm tauri android init --ci
 
-      - name: 编译 APK（仅 arm64-v8a）
-        run: pnpm tauri android build --apk --split-per-abi --target aarch64
+      - name: 编译 APK（按 ABI 分包）
+        run: pnpm tauri android build --apk --split-per-abi --target aarch64 armv7 x86_64
 
       - name: 签名 APK
         env:
@@ -161,12 +161,7 @@ jobs:
           found=0
           for f in $(find src-tauri/gen/android/app/build/outputs/apk -name '*-release*.apk'); do
             abi="$(basename "$(dirname "$(dirname "$f")")")"
-            # 只保留 arm64；其余 ABI 若偶发产出则跳过
-            case "$abi" in
-              arm64-v8a|aarch64) ;;
-              *) echo "skip non-arm64: $f"; continue ;;
-            esac
-            out="artifacts/HGhub_${VERSION}_arm64-v8a.apk"
+            out="artifacts/HGhub_${VERSION}_${abi}.apk"
             "$APKSIGNER" sign \
               --ks "$KS" --ks-key-alias "$KEY_ALIAS" \
               --ks-pass "pass:$STORE_PASSWORD" --key-pass "pass:$KEY_PASSWORD" \
@@ -176,7 +171,7 @@ jobs:
             found=$((found+1))
           done
           rm -f "$KS"
-          if [ "$found" -eq 0 ]; then echo "::error::没有找到 arm64 release APK"; exit 1; fi
+          if [ "$found" -eq 0 ]; then echo "::error::没有找到 release APK"; exit 1; fi
           ls -lh artifacts
 
       - uses: actions/upload-artifact@v4
@@ -249,37 +244,15 @@ jobs:
           path: artifacts/*
           if-no-files-found: error
 
-  # ================= 发布到 GitHub Release =================
-  # tag 推送：正式 Release；手动 workflow_dispatch：用当前版本号建/更新 Release 并上传产物
+  # ================= 发布 =================
   release:
     name: Publish GitHub Release
     needs: [windows, android, macos]
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: 解析 Release 标签
-        id: meta
-        shell: bash
-        run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            TAG="$GITHUB_REF_NAME"
-            DRAFT=false
-            PRERELEASE=false
-          else
-            V="$(node -p "require('./src-tauri/tauri.conf.json').version")"
-            TAG="v${V}"
-            DRAFT=false
-            PRERELEASE=true
-          fi
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "draft=$DRAFT" >> "$GITHUB_OUTPUT"
-          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
-
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -290,11 +263,6 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.meta.outputs.tag }}
-          name: HGhub ${{ steps.meta.outputs.tag }}
-          draft: ${{ steps.meta.outputs.draft }}
-          prerelease: ${{ steps.meta.outputs.prerelease }}
           files: artifacts/*
           generate_release_notes: true
           fail_on_unmatched_files: true
-          make_latest: ${{ startsWith(github.ref, 'refs/tags/v') && 'true' || 'false' }}
