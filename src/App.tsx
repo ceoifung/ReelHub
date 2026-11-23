@@ -16,14 +16,15 @@ import { ToastHost } from "./components/ui";
 import { DesktopRail, DesktopTitleBar } from "./components/DesktopChrome";
 import ResizeHandles from "./components/ResizeHandles";
 import { tracePlayback } from "./playbackDiagnostics";
-import { ICompass, ICompassF, IHome, IHomeF, IUser, IUserF } from "./icons";
+import { ICompass, ICompassF, IHome, IHomeF, ISearch, ISearchF, IUser, IUserF } from "./icons";
 
-/* ============ 底部导航：悬浮白胶囊，三项（首页 / 发现 / 我的） ============ */
+/* ============ 底部导航：悬浮白胶囊，四项等宽（首页 / 发现 / 搜索 / 我的） ============ */
 function TabBar() {
   const { tab, setTab } = useStore();
   const items: { k: Tab; label: string; Icon: typeof IHome; IconOn: typeof IHomeF }[] = [
     { k: "home", label: "首页", Icon: IHome, IconOn: IHomeF },
     { k: "category", label: "发现", Icon: ICompass, IconOn: ICompassF },
+    { k: "search", label: "搜索", Icon: ISearch, IconOn: ISearchF },
     { k: "profile", label: "我的", Icon: IUser, IconOn: IUserF },
   ];
   return (

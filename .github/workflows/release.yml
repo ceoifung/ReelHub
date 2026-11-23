@@ -15,7 +15,7 @@ env:
 
 jobs:
   android:
-    name: Android (split per ABI)
+    name: Android (arm64)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -59,7 +59,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+          targets: aarch64-linux-android
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
@@ -70,8 +70,8 @@ jobs:
       - name: 生成 Android 工程
         run: pnpm tauri android init --ci
 
-      - name: 编译 APK（按 ABI 分包）
-        run: pnpm tauri android build --apk --split-per-abi --target aarch64 armv7 x86_64
+      - name: 编译 APK（仅 arm64）
+        run: pnpm tauri android build --apk --target aarch64
 
       - name: 签名 APK
         env:
@@ -91,9 +91,19 @@ jobs:
           APKSIGNER="$ANDROID_SDK_ROOT/build-tools/$BT/apksigner"
           mkdir -p artifacts
           found=0
-          for f in $(find src-tauri/gen/android/app/build/outputs/apk -name '*-release*.apk'); do
-            abi="$(basename "$(dirname "$(dirname "$f")")")"
-            out="artifacts/ReelHub_${VERSION}_${abi}.apk"
+          mapfile -t apks < <(find src-tauri/gen/android/app/build/outputs/apk -name '*-release*.apk' ! -name '*unaligned*')
+          picked=""
+          for f in "${apks[@]}"; do
+            case "$f" in
+              *arm64*|*aarch64*) picked="$f"; break ;;
+            esac
+          done
+          if [ -z "$picked" ] && [ "${#apks[@]}" -eq 1 ]; then
+            picked="${apks[0]}"
+          fi
+          if [ -n "$picked" ]; then
+            f="$picked"
+            out="artifacts/ReelHub_${VERSION}_arm64.apk"
             "$APKSIGNER" sign \
               --ks "$KS" --ks-key-alias "$KEY_ALIAS" \
               --ks-pass "pass:$STORE_PASSWORD" --key-pass "pass:$KEY_PASSWORD" \
@@ -101,7 +111,7 @@ jobs:
               --out "$out" "$f"
             "$APKSIGNER" verify --print-certs "$out" | head -3
             found=$((found+1))
-          done
+          fi
           rm -f "$KS"
           if [ "$found" -eq 0 ]; then echo "::error::没有找到 release APK"; exit 1; fi
           ls -lh artifacts

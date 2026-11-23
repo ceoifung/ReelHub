@@ -1,6 +1,6 @@
 [package]
 name = "huangguo-client"
-version = "1.2.2"
+version = "1.2.6"
 description = "ReelHub"
 authors = ["ReelHub"]
 license = "PolyForm-Noncommercial-1.0.0"

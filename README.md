@@ -6,13 +6,7 @@ Android 短剧客户端。界面用 React，外壳用 Tauri 2。
 
 打上 `v*` 标签后，GitHub Actions 会编译 Android APK，并挂到对应的 Release 上。也可以在 Actions 里手动运行 **Release**，产物在该次运行的 Artifacts 里。
 
-安装包按 CPU 架构分开：
-
-| 架构 | 文件名 |
-| --- | --- |
-| arm64-v8a | `ReelHub_<版本>_arm64-v8a.apk`（绝大多数手机） |
-| armeabi-v7a | `ReelHub_<版本>_armeabi-v7a.apk` |
-| x86_64 | `ReelHub_<版本>_x86_64.apk`（模拟器） |
+只提供 64 位 ARM 安装包，文件名是 `ReelHub_<版本>_arm64.apk`，覆盖目前的主流手机。
 
 仓库地址：<https://github.com/ceoifung/ReelHub>
 

@@ -229,7 +229,7 @@ export default function Settings({ onBack, wide }: { onBack: () => void; wide: b
       <Modal open={about} onClose={() => setAbout(false)} width={392}>
         <div className="p-5">
           <div className="flex items-center gap-3">
-            <span className="w-11 h-11 rounded-(--r-sm) brand-grad glow-neon flex items-center justify-center text-on-primary text-[17px] font-black">R</span>
+            <img src="/logo.svg" alt="" className="w-11 h-11 rounded-(--r-sm)" />
             <div>
               <div className="text-[16px] font-bold text-on leading-tight">ReelHub</div>
               <div className="text-[11px] text-mut mt-0.5">v{APP_VERSION}</div>
