@@ -1,8 +1,8 @@
 [package]
 name = "huangguo-client"
 version = "1.2.2"
-description = "HGhub · 黄果短剧客户端"
-authors = ["HGhub"]
+description = "ReelHub"
+authors = ["ReelHub"]
 license = "PolyForm-Noncommercial-1.0.0"
 edition = "2021"
 rust-version = "1.90"

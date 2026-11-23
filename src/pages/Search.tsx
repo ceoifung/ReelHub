@@ -76,7 +76,7 @@ export default function Search({ active, wide }: { active: boolean; wide: boolea
         </button>
       </div>
 
-      <div className="flex-1 scroll-y px-4 pb-24">
+      <div className="flex-1 scroll-y px-4 pb-32">
         {!querying ? (
           <>
             {searchHist.length > 0 && (

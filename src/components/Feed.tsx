@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { api, cover, fmt, fmtTime, isMobile } from "../api";
 import type { Detail, Episode, Post, VideoCard } from "../types";
@@ -31,11 +31,15 @@ type Props = {
 
 export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind = "video", active, bottomInset, onBack, onNearEnd, startEp, startTime }: Props) {
   const store = useStore();
-  const { isLiked, isFav, toggleLikeLocal, toggleFavLocal, toggleFollowLocal, muted, setMuted, volume, setVolume, toast, addHistory, user, setLoginOpen, setSeriesOpen } = store;
+  const { isLiked, isFav, toggleLikeLocal, toggleFavLocal, toggleFollowLocal, muted, setMuted, volume, setVolume, toast, addHistory, user, setSeriesOpen } = store;
   const isDesktop = !isMobile;
 
   const boxRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<VideoHandle>(null);
+  /* 上下滑时旧槽位的 ref 会先被置空。忽略 null，避免滑向上一条时把手柄清掉。 */
+  const bindVideo = useCallback((handle: VideoHandle | null) => {
+    if (handle) videoRef.current = handle;
+  }, []);
   const [index, setIndex] = useState(startIndex);
   const [epMap, setEpMap] = useState<Record<number, number>>(() => (startEp ? { [videoIds[startIndex]]: startEp } : {}));
   const [details, setDetails] = useState<Record<number, Detail>>({});
@@ -293,7 +297,9 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
 
   /* 全屏切换或视口旋转后校准滚动容器 scrollTop：
      - 进入全屏时非当前项已隐藏，当前项位于顶部 scrollTop = 0；
-     - 退出全屏回到竖屏列表时，立即将 scrollTop 重新对齐到当前槽位，防止错位。 */
+     - 退出全屏回到竖屏列表时，立即将 scrollTop 重新对齐到当前槽位，防止错位。
+     上下滑本身由 scroll-snap 落位。这里若跟着 index 再写 scrollTop，
+     会在滑动过半时把列表拽到终点，画面闪一下。 */
   useEffect(() => {
     const el = boxRef.current;
     if (!el) return undefined;
@@ -316,7 +322,9 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
       window.clearTimeout(t1);
       window.clearTimeout(t2);
     };
-  }, [fs, vpLandscape, index, epIndex, seriesMode]);
+    // index / epIndex 只在全屏或旋转当帧读取，不能放进依赖，否则每次翻页都会打断滑动。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fs, vpLandscape]);
 
   /* 滚动定位（全屏或缩放手势期间锁定索引，避免容器尺寸变化误触发翻页） */
   const onScroll = useCallback(() => {
@@ -428,12 +436,15 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [curId, curEp, playTry, seriesMode, epIndex, index, seriesEps.length, episodes.length]);
 
-  /* 切换条目/集数时重置播放与缩放状态 */
-  useEffect(() => {
-    setTime(0); setDuration(0); setBuffered(0); setErr(""); setWaiting(true); setPaused(false); setDescOpen(false);
-    setVsize({ w: 0, h: 0 });
+  /* 切换条目/集数时重置播放与缩放状态。
+     邻接槽已经缓冲出画面时不要再盖一层转圈，否则切过去会闪一下。 */
+  useLayoutEffect(() => {
+    setTime(0); setDuration(0); setBuffered(0); setErr(""); setPaused(false); setDescOpen(false);
     setPortraitFit("contain");
     setZoom({ scale: 1, x: 0, y: 0, gesturing: false });
+    const v = videoRef.current?.el();
+    setVsize(v && v.videoWidth > 0 && v.videoHeight > 0 ? { w: v.videoWidth, h: v.videoHeight } : { w: 0, h: 0 });
+    setWaiting(!(v && v.readyState >= 2));
   }, [playKey]);
 
   /* 进出全屏时复位双指缩放并校准滚动条位置 */
@@ -803,7 +814,7 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
     } catch { toast("画中画开启失败", "info"); }
   };
 
-  const requireLogin = () => { if (!user) { setLoginOpen(true); return false; } return true; };
+  const syncAccount = () => !!user && !user.guest;
 
   const spawnHeart = (x: number, y: number) => {
     const id = ++heartIdRef.current;
@@ -821,14 +832,14 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
       spawnHeart(at?.x ?? (box ? box.width * 0.5 : window.innerWidth * 0.5), at?.y ?? (box ? box.height * 0.42 : window.innerHeight * 0.42));
     }
     toast(on ? "已喜欢" : "已取消喜欢", on ? "heart" : "info");
-    if (requireLogin()) { if (kind === "post") api.postLike(curId, on).catch(() => {}); else api.like(curId, curEp, on).catch(() => {}); }
+    if (syncAccount()) { if (kind === "post") api.postLike(curId, on).catch(() => {}); else api.like(curId, curEp, on).catch(() => {}); }
   };
 
   const onFav = () => {
     if (!curId) return;
     const on = toggleFavLocal(curId);
     toast(on ? "已收藏" : "已取消收藏", on ? "star" : "info");
-    if (requireLogin()) { if (kind === "post") api.postCollect(curId, on).catch(() => {}); else api.collect(curId, on).catch(() => {}); }
+    if (syncAccount()) { if (kind === "post") api.postCollect(curId, on).catch(() => {}); else api.collect(curId, on).catch(() => {}); }
   };
 
   const onFollow = () => {
@@ -836,7 +847,7 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
     if (!uid) return;
     const on = toggleFollowLocal(uid);
     toast(on ? `已关注 ${detail?.author?.name}` : "已取消关注", on ? "ok" : "info");
-    if (requireLogin()) api.follow(uid, on).catch(() => {});
+    if (syncAccount()) api.follow(uid, on).catch(() => {});
   };
 
   const scrollToSlot = (slot: number) => {
@@ -970,7 +981,7 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
             <section
               key={key}
               style={!isActive && fs ? { display: "none" } : undefined}
-              className={`relative w-full h-full snap-start snap-always ${fs && isActive ? "" : "overflow-hidden"}`}>
+              className={`relative w-full h-full snap-start snap-always bg-black ${fs && isActive ? "" : "overflow-hidden"}`}>
               {near && slotUrl ? (
                 <div className={isActive ? (rotated ? "fs-landscape" : (!isDesktop && fs ? "fs-immersive" : "absolute inset-0")) : "absolute inset-0"}>
                   <div
@@ -986,7 +997,7 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
                     onPointerCancel={isActive ? ((e) => onUp(e, true)) : undefined}
                     onLostPointerCapture={isActive ? ((e) => onUp(e, true)) : undefined}>
                     <VideoSurface
-                      ref={isActive ? videoRef : undefined}
+                      ref={isActive ? bindVideo : undefined}
                       src={slotUrl}
                       poster={fs && isActive ? undefined : slotPoster}
                       autoPlay={isActive}
@@ -996,7 +1007,7 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
                       muted={muted || !isActive}
                       volume={isActive ? volume : 0}
                       rate={isActive ? effRate : 1}
-                      fit={isActive ? effectiveFit : "contain"}
+                      fit={effectiveFit}
                       scale={isActive ? zoom.scale : 1}
                       panX={isActive ? zoom.x : 0}
                       panY={isActive ? zoom.y : 0}
@@ -1024,18 +1035,18 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
                     </div>
                   )}
 
-                  {/* 暂停 / 缓冲 / 报错恢复 */}
-                  {paused && !err && (
+                  {/* 暂停 / 缓冲 / 报错恢复（只盖当前槽，避免邻接预热画面一起闪） */}
+                  {isActive && paused && !err && (
                     <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
                       <span className="hg-pause-orb">
                         <IPlayF size={28} className="hg-ink ml-0.5" />
                       </span>
                     </div>
                   )}
-                  {waiting && !err && !paused && (
+                  {isActive && waiting && !err && !paused && (
                     <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none"><div className="w-9 h-9 spinner" /></div>
                   )}
-                  {err && (
+                  {isActive && err && (
                     <div className="absolute inset-0 z-30 flex items-center justify-center">
                       <div className="rounded-xl p-5 flex flex-col items-center gap-3 text-[13px] hg-ink-2" style={{ background: "rgba(0,0,0,.74)" }}>
                         <span>视频暂时无法加载</span>

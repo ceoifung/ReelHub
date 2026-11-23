@@ -86,6 +86,7 @@ export const IGamepad = S(<><path d="M7.2 7.5h9.6a5.2 5.2 0 0 1 5.1 6.2l-.7 3.6a
 export const IHeadphones = S(<><path d="M4 14.5V12a8 8 0 0 1 16 0v2.5" /><rect x="3" y="13.5" width="4.6" height="7" rx="2" /><rect x="16.4" y="13.5" width="4.6" height="7" rx="2" /></>);
 export const IBowl = S(<><path d="M3.5 11.5h17a8.5 8.5 0 0 1-17 0Z" /><path d="M8.5 20.5h7" /><path d="M9.3 8c0-1.6 1.4-1.6 1.4-3.2M13.3 8c0-1.6 1.4-1.6 1.4-3.2" /></>);
 export const ICompass = S(<><circle cx="12" cy="12" r="8.5" /><path d="m15.6 8.4-2.1 5.1-5.1 2.1 2.1-5.1Z" fill="currentColor" stroke="none" /></>);
+export const ICompassF = S(<><circle cx="12" cy="12" r="9" /><path d="m15.6 8.2-2.2 5.2-5.2 2.2 2.2-5.2Z" fill="#fff" stroke="none" /></>, true);
 export const IPawF = S(<><ellipse cx="6.6" cy="9.6" rx="1.9" ry="2.5" /><ellipse cx="17.4" cy="9.6" rx="1.9" ry="2.5" /><ellipse cx="10" cy="5.6" rx="1.8" ry="2.4" /><ellipse cx="14" cy="5.6" rx="1.8" ry="2.4" /><path d="M12 11.2c3.1 0 5.6 2.6 5.6 5.3 0 1.8-1.3 3-3 3-1 0-1.8-.5-2.6-.5s-1.6.5-2.6.5c-1.7 0-3-1.2-3-3 0-2.7 2.5-5.3 5.6-5.3Z" /></>, true);
 export const ICpu = S(<><rect x="6" y="6" width="12" height="12" rx="2" /><rect x="9.5" y="9.5" width="5" height="5" rx="1" /><path d="M9 3v3M12 3v3M15 3v3M9 18v3M12 18v3M15 18v3M3 9h3M3 12h3M3 15h3M18 9h3M18 12h3M18 15h3" /></>);
 export const IPhone = S(<><rect x="6" y="2.5" width="12" height="19" rx="2.6" /><path d="M10.5 18.5h3" /></>);

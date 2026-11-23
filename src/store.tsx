@@ -55,6 +55,30 @@ type Persist = {
 };
 
 const LS = "hghub_app_v1";
+const GUEST_KEY = "hghub_guest_v1";
+
+/** 没有正式登录时使用的本机账号。收藏、点赞、关注都写在本地，不走登录接口。 */
+function loadGuest(): User {
+  try {
+    const raw = localStorage.getItem(GUEST_KEY);
+    if (raw) {
+      const saved = JSON.parse(raw) as User;
+      if (saved?.guest && saved.nickname && typeof saved.id === "number") return saved;
+    }
+  } catch { /* 坏数据就重新分配 */ }
+  const n = Math.floor(1000 + Math.random() * 9000);
+  const guest: User = {
+    id: -n,
+    username: `local${n}`,
+    nickname: `访客${n}`,
+    avatar: "",
+    avatar_color: "#2F6BFF",
+    guest: true,
+    sign: "收藏和关注保存在本机",
+  };
+  try { localStorage.setItem(GUEST_KEY, JSON.stringify(guest)); } catch { /* ignore */ }
+  return guest;
+}
 const DEFAULTS: Persist = {
   likes: [], favs: [], history: [], follows: [],
   muted: true, muteOnStartup: true, volume: 0.7, searchHist: [],
@@ -142,7 +166,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(readTheme);
   const [tab, setTabRaw] = useState<Tab>("home");
   const [stack, setStack] = useState<Page[]>([]);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(loadGuest);
   const [loginOpen, setLoginOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [theater, setTheaterState] = useState(false);
@@ -167,7 +191,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     api.boot()
       .then((r) => {
-        if (r.user && (r.user as User).id) setUser(r.user as User);
+        if (r.logged_in && r.user && (r.user as User).id) setUser(r.user as User);
+        else setUser((cur) => (cur && !cur.guest ? cur : loadGuest()));
         if (typeof r.strict_security === "boolean") {
           setStrictSecurityState(r.strict_security);
           setHtmlStrictSecurity(r.strict_security);
@@ -175,7 +200,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
         setCliRelaxed(!!r.cli_relaxed);
       })
-      .catch(() => { /* 离线也能用 */ });
+      .catch(() => setUser((cur) => cur ?? loadGuest()));
   }, []);
 
   const setStrictSecurity = useCallback(async (on: boolean) => {
@@ -257,8 +282,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     try { await api.logout(); } catch { /* ignore */ }
-    setUser(null);
-    toast("已退出登录", "info");
+    setUser(loadGuest());
+    toast("已退出登录，继续使用本机账号", "info");
   }, [toast]);
 
   const setTheater = useCallback((v: boolean | ((prev: boolean) => boolean)) => {

@@ -124,6 +124,8 @@ export type User = {
   nickname: string;
   avatar: string;
   avatar_color: string;
+  /** 本机临时账号：收藏、关注只写在这台设备，不请求登录接口 */
+  guest?: boolean;
   sign?: string;
   desc?: string;
   user_type?: string;

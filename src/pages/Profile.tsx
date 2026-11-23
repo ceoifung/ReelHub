@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
-import { api, APP_VERSION, fmt, fmtTime, isMobile, platform } from "../api";
+import { api, APP_VERSION, fmt, fmtTime, isMobile } from "../api";
 import type { Detail } from "../types";
 import { useStore } from "../store";
 import { Avatar, Empty, Img } from "../components/ui";
-import { IChevR, IClock, ILogout, ISettings, IStar, IUser } from "../icons";
+import { IChevR, IClock, ILogout, ISettings, IStar } from "../icons";
 
 /* 我的：结构固定（资料卡 + 我的收藏 / 观看历史）。
-   收藏与观看记录都存在本地，所以未登录也照常展示；未登录时资料卡本身就是登录入口。 */
+   默认是本机临时账号，收藏、点赞和关注都写在这台设备上。 */
 export default function Profile({ wide }: { wide: boolean }) {
-  const { user, setLoginOpen, logout, history, favs, clearHistory, push } = useStore();
+  const { user, setLoginOpen, logout, history, favs, likes, follows, clearHistory, push } = useStore();
   const [tab, setTab] = useState<"fav" | "history">("fav");
   const [cards, setCards] = useState<Detail[]>([]);
   const [loading, setLoading] = useState(false);
@@ -42,9 +42,9 @@ export default function Profile({ wide }: { wide: boolean }) {
         )}
       </div>
 
-      <div className="flex-1 scroll-y px-4 pt-2 pb-24">
-        {/* 资料卡：已登录 / 未登录（点开登录抽屉） */}
-        {user ? (
+      <div className="flex-1 scroll-y px-4 pt-2 pb-32">
+        {/* 资料卡：正式账号 / 本机临时账号 */}
+        {user && !user.guest ? (
           <div className="rounded-(--r-lg) bg-s1 p-4 elev-1 flex items-center gap-3.5 a-rise">
             <Avatar size={56} name={user.nickname} hue={280} ring />
             <div className="flex-1 min-w-0">
@@ -62,21 +62,22 @@ export default function Profile({ wide }: { wide: boolean }) {
             </button>
           </div>
         ) : (
-          <button onClick={() => setLoginOpen(true)}
-            className="w-full text-left rounded-(--r-lg) bg-s1 p-4 elev-1 flex items-center gap-3.5 pressable a-rise">
-            <Avatar size={56} icon={<IUser size={26} />} hue={220} ring />
+          <div className="rounded-(--r-lg) bg-s1 p-4 elev-1 flex items-center gap-3.5 a-rise">
+            <Avatar size={56} name={user?.nickname || "访客"} hue={220} ring />
             <div className="flex-1 min-w-0">
-              <div className="text-[16px] font-bold text-on">未登录</div>
-              <div className="text-[11px] text-mut mt-0.5">登录后可同步点赞、收藏与评论</div>
+              <div className="text-[16px] font-bold text-on truncate">{user?.nickname || "访客"}</div>
+              <div className="text-[11px] text-mut mt-0.5">本机临时账号 · 收藏和关注保存在这台设备</div>
               <div className="flex gap-3 mt-2 text-[10.5px] text-mut">
+                <span>点赞 <b className="text-on">{likes.length}</b></span>
                 <span>收藏 <b className="text-on">{favs.length}</b></span>
-                <span>观看 <b className="text-on">{history.length}</b></span>
+                <span>关注 <b className="text-on">{follows.length}</b></span>
               </div>
             </div>
-            <span className="flex items-center gap-0.5 h-8 pl-3 pr-2 rounded-full bg-primary text-on-primary text-[11.5px] font-semibold">
+            <button onClick={() => setLoginOpen(true)}
+              className="flex items-center gap-0.5 h-8 pl-3 pr-2 rounded-full bg-primary text-on-primary text-[11.5px] font-semibold pressable">
               登录<IChevR size={13} />
-            </span>
-          </button>
+            </button>
+          </div>
         )}
 
         {/* 我的内容 */}
@@ -126,7 +127,7 @@ export default function Profile({ wide }: { wide: boolean }) {
           )}
         </div>
 
-        <div className="text-center text-[10px] text-dim mt-5">HGhub {APP_VERSION} · {platform === "android" ? "Android" : platform === "ios" ? "iOS" : platform === "macos" ? "macOS" : platform === "linux" ? "Linux" : "Windows"} 客户端</div>
+        <div className="text-center text-[10px] text-dim mt-5">ReelHub {APP_VERSION}</div>
       </div>
     </div>
   );

@@ -342,7 +342,12 @@ const VideoSurface = forwardRef<VideoHandle, Props>(function VideoSurface(
           opacity: ready ? 1 : 0,
           transform: hasTransform ? `translate3d(${panX}px, ${panY}px, 0) scale(${scale})` : "translateZ(0)",
           transformOrigin: "center center",
-          transition: isGesturing ? "opacity .25s" : "opacity .25s, transform .2s cubic-bezier(.2,0,0,1)",
+          /* 已经出画后不再做透明度过渡。滚动时这条过渡会让视频层闪一下。 */
+          transition: !ready
+            ? "opacity .2s"
+            : isGesturing || !hasTransform
+              ? "none"
+              : "transform .2s cubic-bezier(.2,0,0,1)",
         }}
         onLoadedData={(e) => {
           const v = e.target as HTMLVideoElement;

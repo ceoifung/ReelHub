@@ -85,7 +85,7 @@ export function CommentsPanel({ videoId, ep, total, kind = "video", onClose }: {
   const send = async () => {
     const t = text.trim();
     if (!t) return;
-    if (!user) { setLoginOpen(true); return; }
+    if (!user || user.guest) { setLoginOpen(true); return; }
     setSending(true);
     try {
       await api.commentSend(videoId, ep, t);
@@ -143,8 +143,8 @@ export function CommentsPanel({ videoId, ep, total, kind = "video", onClose }: {
       <form className="shrink-0 flex items-center gap-2 px-3 py-2.5 bg-s2/70" onSubmit={(e) => { e.preventDefault(); send(); }}>
         <Avatar size={30} name={user?.nickname || "我"} hue={322} />
         <input ref={inputRef} value={text} onChange={(e) => setText(e.target.value)}
-          onFocus={() => { if (!user) setLoginOpen(true); }}
-          placeholder={user ? "说点什么…" : "登录后参与评论"}
+          onFocus={() => { if (!user || user.guest) setLoginOpen(true); }}
+          placeholder={user && !user.guest ? "说点什么…" : "登录后参与评论"}
           className="flex-1 min-w-0 h-9 rounded-(--r-ctl) bg-s4 px-3.5 text-[12.5px] text-on placeholder-dim outline-none focus:bg-s3" />
         <button type="submit" disabled={!text.trim() || sending}
           className={`w-9 h-9 rounded-full flex items-center justify-center pressable ${text.trim() ? "brand-grad glow-neon" : "bg-s3 text-dim"}`}>

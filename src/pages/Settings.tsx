@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { api, APP_VERSION, hostOf, logLine, platform } from "../api";
+import { api, APP_VERSION, hostOf, logLine } from "../api";
 import { useStore } from "../store";
 import { Modal, Toggle } from "../components/ui";
 import LinePicker from "../components/LinePicker";
@@ -213,14 +213,14 @@ export default function Settings({ onBack, wide }: { onBack: () => void; wide: b
             <button onClick={() => setAbout(true)} className="w-full flex items-center gap-3 px-3.5 py-3 text-left pressable">
               <span className="w-8 h-8 rounded-full bg-s3 flex items-center justify-center text-primary"><IInfo size={16} /></span>
               <div className="flex-1">
-                <div className="text-[12.5px] text-on">关于 HGhub</div>
-                <div className="text-[10.5px] text-mut">版本 {APP_VERSION} · 仅限非商业使用</div>
+                <div className="text-[12.5px] text-on">关于 ReelHub</div>
+                <div className="text-[10.5px] text-mut">版本 {APP_VERSION}</div>
               </div>
               <IChevR size={15} className="text-mut" />
             </button>
           </Section>
 
-          <div className="text-center text-[10px] text-dim mt-5">HGhub {APP_VERSION} · {platform === "android" ? "Android" : platform === "ios" ? "iOS" : platform === "macos" ? "macOS" : platform === "linux" ? "Linux" : "Windows"} 客户端</div>
+          <div className="text-center text-[10px] text-dim mt-5">ReelHub {APP_VERSION}</div>
         </div>
       </div>
 
@@ -229,41 +229,24 @@ export default function Settings({ onBack, wide }: { onBack: () => void; wide: b
       <Modal open={about} onClose={() => setAbout(false)} width={392}>
         <div className="p-5">
           <div className="flex items-center gap-3">
-            <span className="w-11 h-11 rounded-(--r-sm) brand-grad glow-neon flex items-center justify-center text-on-primary text-[17px] font-black">H</span>
+            <span className="w-11 h-11 rounded-(--r-sm) brand-grad glow-neon flex items-center justify-center text-on-primary text-[17px] font-black">R</span>
             <div>
-              <div className="text-[16px] font-bold text-on leading-tight">HGhub</div>
-              <div className="text-[11px] text-mut mt-0.5">黄果短剧 · 第三方客户端 v{APP_VERSION}</div>
+              <div className="text-[16px] font-bold text-on leading-tight">ReelHub</div>
+              <div className="text-[11px] text-mut mt-0.5">v{APP_VERSION}</div>
             </div>
           </div>
 
           <p className="text-[12px] text-on/70 leading-relaxed mt-4">
-            基于 Rust + Tauri 2 构建的跨平台客户端，支持 Windows、macOS、Android 与 Linux。
-            界面遵循 Fluent 设计语言，播放器采用沉浸式竖屏信息流。
+            Android 短剧客户端。界面用 React，外壳用 Tauri 2，播放器是竖屏信息流。
           </p>
 
-          <div className="mt-4 rounded-(--r-sm) bg-s3/60 p-3 text-[11px] text-mut leading-relaxed">
-            本项目仅供学习与交流，所有内容均来自上游站点，客户端不存储、不分发任何视频内容。
-            请于 24 小时内删除相关资源，并支持正版。
-          </div>
-
           <div className="mt-4 divide-y divide-s3">
-            <button onClick={() => { navigator.clipboard?.writeText("https://github.com/Minireel/HGhub").then(() => toast("仓库地址已复制", "ok")).catch(() => {}); }}
+            <button onClick={() => { navigator.clipboard?.writeText("https://github.com/ceoifung/ReelHub").then(() => toast("仓库地址已复制", "ok")).catch(() => {}); }}
               className="w-full flex items-center gap-2 py-2.5 text-left pressable">
               <ILink size={15} className="text-mut" />
-              <span className="text-[12px] text-on/85">github.com/Minireel/HGhub</span>
+              <span className="text-[12px] text-on/85">github.com/ceoifung/ReelHub</span>
               <span className="ml-auto text-[10.5px] text-primary">复制</span>
             </button>
-            <button onClick={() => { navigator.clipboard?.writeText("https://huangguoai.com").then(() => toast("站点地址已复制", "ok")).catch(() => {}); }}
-              className="w-full flex items-center gap-2 py-2.5 text-left pressable">
-              <ILink size={15} className="text-mut" />
-              <span className="text-[12px] text-on/85">huangguoai.com</span>
-              <span className="ml-auto text-[10.5px] text-primary">复制</span>
-            </button>
-            <div className="flex items-center gap-2 py-2.5">
-              <IInfo size={15} className="text-mut" />
-              <span className="text-[12px] text-on/85">PolyForm Noncommercial 1.0.0</span>
-              <span className="ml-auto text-[10.5px] text-mut">仅限非商业</span>
-            </div>
           </div>
 
           <button onClick={() => setAbout(false)} className="mt-4 w-full h-9 rounded-(--r-ctl) bg-s3 text-[12.5px] text-on pressable">知道了</button>

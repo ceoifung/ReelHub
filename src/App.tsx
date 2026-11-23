@@ -16,71 +16,32 @@ import { ToastHost } from "./components/ui";
 import { DesktopRail, DesktopTitleBar } from "./components/DesktopChrome";
 import ResizeHandles from "./components/ResizeHandles";
 import { tracePlayback } from "./playbackDiagnostics";
-import { IGrid, IGridF, IHome, IHomeF, ISearch, IUser, IUserF, Logo } from "./icons";
+import { ICompass, ICompassF, IHome, IHomeF, IUser, IUserF } from "./icons";
 
-/* ============ 底部标签栏（Telegram 风格：图标 + 文案 + 毛玻璃） ============ */
+/* ============ 底部导航：悬浮白胶囊，三项（首页 / 发现 / 我的） ============ */
 function TabBar() {
-  const { tab, setTab, theme } = useStore();
+  const { tab, setTab } = useStore();
   const items: { k: Tab; label: string; Icon: typeof IHome; IconOn: typeof IHomeF }[] = [
     { k: "home", label: "首页", Icon: IHome, IconOn: IHomeF },
-    { k: "search", label: "搜索", Icon: ISearch, IconOn: ISearch },
-    { k: "category", label: "分类", Icon: IGrid, IconOn: IGridF },
+    { k: "category", label: "发现", Icon: ICompass, IconOn: ICompassF },
     { k: "profile", label: "我的", Icon: IUser, IconOn: IUserF },
   ];
-  const overVideo = tab === "home";
-  const lightBar = !overVideo && theme === "light";
-  const accent = "#3390ec";
-  const mute = lightBar ? "rgba(0,0,0,.45)" : "rgba(255,255,255,.55)";
   return (
-    <nav
-      className="hg-tabbar absolute bottom-0 inset-x-0 z-30"
-      style={{
-        paddingBottom: "var(--sab, 0px)",
-        background: lightBar
-          ? "rgba(247,247,247,.92)"
-          : overVideo
-            ? "rgba(13,13,13,.78)"
-            : "rgba(22,22,24,.92)",
-        borderTop: lightBar ? "0.33px solid rgba(0,0,0,.12)" : "0.33px solid rgba(255,255,255,.1)",
-        backdropFilter: "saturate(180%) blur(24px)",
-        WebkitBackdropFilter: "saturate(180%) blur(24px)",
-        boxShadow: lightBar ? "0 -0.5px 0 rgba(0,0,0,.04)" : "0 -0.5px 0 rgba(255,255,255,.04)",
-      }}>
-      <div className="h-[49px] flex items-stretch px-0.5">
-        {items.map(({ k, label, Icon, IconOn }) => {
-          const on = tab === k;
-          const Ico = on ? IconOn : Icon;
-          return (
-            <button
-              key={k}
-              onClick={() => setTab(k)}
-              className="hg-tab-item flex-1 h-full flex flex-col items-center justify-center gap-[2px] pressable"
-              aria-current={on ? "page" : undefined}
-              style={{ WebkitTapHighlightColor: "transparent" }}>
-              <Ico
-                size={24}
-                strokeWidth={on ? 2.15 : 1.75}
-                style={{
-                  color: on ? accent : mute,
-                  transition: "color .15s ease, transform .15s ease",
-                  transform: on ? "translateY(-0.5px)" : undefined,
-                }}
-              />
-              <span
-                className="leading-none"
-                style={{
-                  fontSize: 10,
-                  letterSpacing: "-0.01em",
-                  fontWeight: on ? 600 : 400,
-                  color: on ? accent : mute,
-                  transition: "color .15s ease",
-                }}>
-                {label}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+    <nav className="hg-dock" aria-label="主导航">
+      {items.map(({ k, label, Icon, IconOn }) => {
+        const on = tab === k;
+        const Ico = on ? IconOn : Icon;
+        return (
+          <button
+            key={k}
+            onClick={() => setTab(k)}
+            className="hg-dock-item pressable"
+            aria-current={on ? "page" : undefined}>
+            <Ico size={22} strokeWidth={on ? 2.2 : 1.8} />
+            <span>{label}</span>
+          </button>
+        );
+      })}
     </nav>
   );
 }
@@ -142,7 +103,7 @@ function AppBody() {
 
   const vis = (k: Tab) => (tab === k ? "absolute inset-0" : "absolute inset-0 invisible pointer-events-none");
   const pageActive = stack.length === 0 && !loginOpen;
-  const bottomInset = isMobile ? (fs || clean || seriesOpen ? 0 : 49) : 14;
+  const bottomInset = isMobile ? (fs || clean || seriesOpen ? 0 : 86) : 14;
   /* 栈页（从搜索/分类/我的进入的播放页、图文页）没有底栏，
      底部只让出安全区。之前多留了 20px，视频底边会露出一条
      「底栏」似的窄缝（底部的压暗渐变到不了屏幕最底）。 */
